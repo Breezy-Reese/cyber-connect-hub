@@ -1,138 +1,137 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Monitor, Ticket, User, Lock, ArrowRight } from "lucide-react";
+// src/components/Login.tsx
+import React, { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
-const Login = () => {
+const Login: React.FC = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginType, setLoginType] = useState<'password' | 'ticket'>('password');
+  const [ticketCode, setTicketCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  const { login } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [ticketCode, setTicketCode] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleCredentialLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    // TODO: Connect to backend
-    setTimeout(() => {
-      setIsLoading(false);
-      navigate("/client");
-    }, 500);
-  };
+    setLoading(true);
 
-  const handleTicketLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    // TODO: Connect to backend
-    setTimeout(() => {
-      setIsLoading(false);
-      navigate("/client");
-    }, 500);
+    const credentials = loginType === 'password' 
+      ? { username, password, loginType: 'password' }
+      : { ticketCode, loginType: 'ticket' };
+
+    const result = await login(credentials);
+    
+    if (result.success) {
+      toast.success('Login successful!');
+      if (result.user?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
+    } else {
+      toast.error(result.error || 'Login failed');
+    }
+    
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
-      </div>
-
-      <div className="w-full max-w-md relative">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <Monitor className="w-10 h-10 text-primary neon-text" />
-            <h1 className="text-3xl font-bold text-primary neon-text">CyberCafe</h1>
-          </div>
-          <p className="text-muted-foreground">Log in to start your session</p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Cyber Café Login
+          </h2>
+        </div>
+        
+        <div className="flex justify-center space-x-4">
+          <button
+            onClick={() => setLoginType('password')}
+            className={`px-4 py-2 rounded ${
+              loginType === 'password' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            Password Login
+          </button>
+          <button
+            onClick={() => setLoginType('ticket')}
+            className={`px-4 py-2 rounded ${
+              loginType === 'ticket' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            Ticket Code
+          </button>
         </div>
 
-        <div className="glass-card p-6">
-          <Tabs defaultValue="credentials" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-secondary">
-              <TabsTrigger value="credentials" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-display text-xs">
-                <User className="w-4 h-4 mr-2" />
-                Username
-              </TabsTrigger>
-              <TabsTrigger value="ticket" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-display text-xs">
-                <Ticket className="w-4 h-4 mr-2" />
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {loginType === 'password' ? (
+            <>
+              <div>
+                <label htmlFor="username" className="sr-only">
+                  Username
+                </label>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  required
+                  className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                  placeholder="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="password" className="sr-only">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </>
+          ) : (
+            <div>
+              <label htmlFor="ticketCode" className="sr-only">
                 Ticket Code
-              </TabsTrigger>
-            </TabsList>
+              </label>
+              <input
+                id="ticketCode"
+                name="ticketCode"
+                type="text"
+                required
+                className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Enter Ticket Code"
+                value={ticketCode}
+                onChange={(e) => setTicketCode(e.target.value.toUpperCase())}
+              />
+            </div>
+          )}
 
-            <TabsContent value="credentials" className="mt-6">
-              <form onSubmit={handleCredentialLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username" className="text-foreground">Username</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="username"
-                      placeholder="Enter your username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="pl-10 bg-secondary border-border focus:border-primary focus:ring-primary"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-foreground">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 bg-secondary border-border focus:border-primary focus:ring-primary"
-                      required
-                    />
-                  </div>
-                </div>
-                <Button type="submit" className="w-full neon-glow" disabled={isLoading}>
-                  {isLoading ? "Logging in..." : "Start Session"}
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="ticket" className="mt-6">
-              <form onSubmit={handleTicketLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ticket" className="text-foreground">Ticket Code</Label>
-                  <div className="relative">
-                    <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="ticket"
-                      placeholder="Enter your ticket code"
-                      value={ticketCode}
-                      onChange={(e) => setTicketCode(e.target.value)}
-                      className="pl-10 bg-secondary border-border focus:border-primary focus:ring-primary font-display tracking-widest text-center"
-                      required
-                    />
-                  </div>
-                </div>
-                <Button type="submit" className="w-full neon-glow" disabled={isLoading}>
-                  {isLoading ? "Validating..." : "Start Session"}
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-
-          <div className="mt-6 pt-4 border-t border-border text-center">
+          <div>
             <button
-              onClick={() => navigate("/admin")}
-              className="text-sm text-muted-foreground hover:text-primary transition-colors font-display"
+              type="submit"
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
-              Admin Login →
+              {loading ? 'Logging in...' : 'Sign in'}
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

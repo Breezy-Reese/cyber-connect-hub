@@ -1,30 +1,49 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import Login from "./pages/Login";
-import ClientDashboard from "./pages/ClientDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import NotFound from "./pages/NotFound";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Login from './pages/Login';
+import AdminDashboard from './pages/AdminDashboard';
+import Dashboard from './pages/ClientDashboard';
+import NotFound from './pages/NotFound';
 
-const queryClient = new QueryClient();
+const AppContent: React.FC = () => {
+  const { user, loading } = useAuth();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/client" element={<ClientDashboard />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
+      <Route path="/dashboard" element={
+        user ? (
+          user.role === 'admin' ? <AdminDashboard /> : <Dashboard />
+        ) : <Navigate to="/login" />
+      } />
+      <Route path="/admin" element={
+        user?.role === 'admin' ? <AdminDashboard /> : <Navigate to="/dashboard" />
+      } />
+      <Route path="/" element={<Navigate to="/dashboard" />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <Router>
+        <Toaster position="top-right" />
+        <AppContent />
+      </Router>
+    </AuthProvider>
+  );
+};
 
 export default App;
