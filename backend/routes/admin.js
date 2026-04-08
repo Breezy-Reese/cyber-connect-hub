@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate, adminAuth } = require('../middleware/auth');
+const { protect: authenticate, adminOnly: adminAuth } = require('../middleware/auth');
 const User = require('../models/User');
 const Session = require('../models/Session');
 const Computer = require('../models/Computer');

@@ -1,49 +1,50 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+// src/App.tsx
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
-import Dashboard from './pages/ClientDashboard';
+import ClientDashboard from './pages/ClientDashboard';
+import ProtectedRoute from './components/ProtectedRoute';
 import NotFound from './pages/NotFound';
 
-const AppContent: React.FC = () => {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Loading...</div>
-      </div>
-    );
-  }
-
+const ToasterWithTheme = () => {
+  const { isDark } = useTheme();
   return (
-    <Routes>
-      <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
-      <Route path="/dashboard" element={
-        user ? (
-          user.role === 'admin' ? <AdminDashboard /> : <Dashboard />
-        ) : <Navigate to="/login" />
-      } />
-      <Route path="/admin" element={
-        user?.role === 'admin' ? <AdminDashboard /> : <Navigate to="/dashboard" />
-      } />
-      <Route path="/" element={<Navigate to="/dashboard" />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <Toaster
+      position="top-right"
+      toastOptions={{
+        style: {
+          background: isDark ? '#0f1525' : '#ffffff',
+          color: isDark ? '#e2e8f0' : '#0f172a',
+          border: `1px solid ${isDark ? '#1e2d4a' : '#e2e8f0'}`,
+          fontFamily: "'Share Tech Mono', monospace",
+          fontSize: '0.85rem',
+        },
+        success: { iconTheme: { primary: '#10b981', secondary: isDark ? '#0f1525' : '#ffffff' } },
+        error:   { iconTheme: { primary: '#ef4444', secondary: isDark ? '#0f1525' : '#ffffff' } },
+      }}
+    />
   );
 };
 
-const App: React.FC = () => {
+function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Toaster position="top-right" />
-        <AppContent />
-      </Router>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <ToasterWithTheme />
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute requiredRole="client"><ClientDashboard /></ProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
-};
+}
 
 export default App;

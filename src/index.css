@@ -1,88 +1,64 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+/* src/index.css */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600&display=swap');
 
-@layer base {
-  :root {
-    --background: 220 20% 7%;
-    --foreground: 180 10% 90%;
-
-    --card: 220 18% 10%;
-    --card-foreground: 180 10% 90%;
-
-    --popover: 220 18% 12%;
-    --popover-foreground: 180 10% 90%;
-
-    --primary: 175 80% 50%;
-    --primary-foreground: 220 20% 7%;
-
-    --secondary: 220 15% 16%;
-    --secondary-foreground: 180 10% 80%;
-
-    --muted: 220 15% 14%;
-    --muted-foreground: 220 10% 50%;
-
-    --accent: 35 90% 55%;
-    --accent-foreground: 220 20% 7%;
-
-    --destructive: 0 70% 55%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 220 15% 18%;
-    --input: 220 15% 16%;
-    --ring: 175 80% 50%;
-
-    --radius: 0.5rem;
-
-    --success: 145 65% 45%;
-    --success-foreground: 220 20% 7%;
-    --warning: 35 90% 55%;
-    --warning-foreground: 220 20% 7%;
-
-    --neon-glow: 0 0 20px hsl(175 80% 50% / 0.3), 0 0 40px hsl(175 80% 50% / 0.1);
-    --neon-glow-strong: 0 0 20px hsl(175 80% 50% / 0.5), 0 0 60px hsl(175 80% 50% / 0.2);
-    --card-shadow: 0 4px 24px hsl(220 20% 4% / 0.5);
-
-    --font-display: 'Fira Code', monospace;
-    --font-body: 'Inter', sans-serif;
-
-    --sidebar-background: 220 18% 8%;
-    --sidebar-foreground: 180 10% 80%;
-    --sidebar-primary: 175 80% 50%;
-    --sidebar-primary-foreground: 220 20% 7%;
-    --sidebar-accent: 220 15% 14%;
-    --sidebar-accent-foreground: 180 10% 90%;
-    --sidebar-border: 220 15% 18%;
-    --sidebar-ring: 175 80% 50%;
-  }
+/* ── Dark theme (default) ── */
+:root, [data-theme="dark"] {
+  --bg:          #0a0e1a;
+  --surface:     #0f1525;
+  --surface2:    #141929;
+  --border:      #1e2d4a;
+  --primary:     #00d4ff;
+  --accent:      #7c3aed;
+  --success:     #10b981;
+  --warning:     #f59e0b;
+  --danger:      #f87171;
+  --muted:       #4a5568;
+  --text:        #e2e8f0;
+  --text2:       #94a3b8;
+  --text3:       #64748b;
+  --card-bg:     #0f1525;
+  --input-bg:    #0a0e1a;
+  --tab-bg:      #0a0e1a;
+  --scanline:    rgba(0,212,255,0.012);
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground font-body;
-  }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
-  }
+/* ── Light theme ── */
+[data-theme="light"] {
+  --bg:          #f0f4f8;
+  --surface:     #ffffff;
+  --surface2:    #f8fafc;
+  --border:      #e2e8f0;
+  --primary:     #0284c7;
+  --accent:      #7c3aed;
+  --success:     #059669;
+  --warning:     #d97706;
+  --danger:      #dc2626;
+  --muted:       #9ca3af;
+  --text:        #0f172a;
+  --text2:       #475569;
+  --text3:       #94a3b8;
+  --card-bg:     #ffffff;
+  --input-bg:    #f8fafc;
+  --tab-bg:      #f1f5f9;
+  --scanline:    transparent;
 }
 
-@layer utilities {
-  .neon-glow {
-    box-shadow: var(--neon-glow);
-  }
-  .neon-glow-strong {
-    box-shadow: var(--neon-glow-strong);
-  }
-  .neon-text {
-    text-shadow: 0 0 10px hsl(175 80% 50% / 0.5), 0 0 30px hsl(175 80% 50% / 0.2);
-  }
-  .glass-card {
-    @apply bg-card/80 backdrop-blur-md border border-border rounded-lg;
-    box-shadow: var(--card-shadow);
-  }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
 }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface2); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }

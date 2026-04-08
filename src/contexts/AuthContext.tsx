@@ -1,115 +1,92 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { authAPI } from '../services/api';
-import socketService from '../services/socket';
-import { User } from '../services/api';
+// src/contexts/AuthContext.tsx
+import React, { createContext, useContext, useState, useEffect } from 'react';
+
+interface User {
+  id: string;
+  username: string;
+  role: 'admin' | 'client';
+  pc?: string;
+  sessionId?: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  loading: boolean;
-  isAuthenticated: boolean;
-  isAdmin: boolean;
-  login: (credentials: any) => Promise<{ success: boolean; error?: string; user?: User }>;
-  register: (userData: any) => Promise<{ success: boolean; error?: string; user?: User }>;
+  token: string | null;
+  login: (credentials: Record<string, string>) => Promise<{ success: boolean; user?: User; error?: string }>;
   logout: () => void;
+  isAuthenticated: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | null>(null);
 
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
-};
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(null);
 
+  // Restore session from localStorage on mount
   useEffect(() => {
-    if (token) {
-      loadUser();
-    } else {
-      setLoading(false);
+    const savedToken = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    if (savedToken && savedUser) {
+      setToken(savedToken);
+      setUser(JSON.parse(savedUser));
     }
-  }, [token]);
+  }, []);
 
-  const loadUser = async (): Promise<void> => {
+  const login = async (
+    credentials: Record<string, string>
+  ): Promise<{ success: boolean; user?: User; error?: string }> => {
     try {
-      const response = await authAPI.getMe();
-      setUser(response.data.user);
-      
-      // Connect socket
-      if (token) {
-        socketService.connect(token);
+      const endpoint =
+        credentials.loginType === 'ticket'
+          ? `${API_URL}/auth/ticket`
+          : `${API_URL}/auth/login`;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return { success: false, error: data.message || 'Login failed' };
       }
-    } catch (error) {
-      console.error('Failed to load user:', error);
-      logout();
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const login = async (credentials: any): Promise<{ success: boolean; error?: string; user?: User }> => {
-    try {
-      const response = await authAPI.login(credentials);
-      const { token: newToken, user: userData } = response.data;
-      
-      localStorage.setItem('token', newToken);
+      const { token: newToken, user: newUser } = data;
+
       setToken(newToken);
-      setUser(userData);
-      
-      // Connect socket
-      socketService.connect(newToken);
-      
-      return { success: true, user: userData };
-    } catch (error: any) {
-      return { 
-        success: false, 
-        error: error.response?.data?.error || 'Login failed' 
-      };
+      setUser(newUser);
+      localStorage.setItem('token', newToken);
+      localStorage.setItem('user', JSON.stringify(newUser));
+
+      return { success: true, user: newUser };
+    } catch (err) {
+      return { success: false, error: 'Network error. Please try again.' };
     }
   };
 
-  const register = async (userData: any): Promise<{ success: boolean; error?: string; user?: User }> => {
-    try {
-      const response = await authAPI.register(userData);
-      return { success: true, user: response.data.user };
-    } catch (error: any) {
-      return { 
-        success: false, 
-        error: error.response?.data?.error || 'Registration failed' 
-      };
-    }
-  };
-
-  const logout = (): void => {
-    localStorage.removeItem('token');
-    setToken(null);
+  const logout = () => {
     setUser(null);
-    socketService.disconnect();
-  };
-
-  const value: AuthContextType = {
-    user,
-    loading,
-    isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin',
-    login,
-    register,
-    logout,
+    setToken(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{ user, token, login, logout, isAuthenticated: !!user }}
+    >
       {children}
     </AuthContext.Provider>
   );
+};
+
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
+  return ctx;
 };

@@ -1,58 +1,70 @@
+// backend/routes/requests.js
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth');
 const Request = require('../models/Request');
+const { protect, adminOnly } = require('../middleware/auth');
 
-// Get user's requests
-router.get('/', authenticate, async (req, res) => {
+// GET pending requests (admin)
+router.get('/pending', protect, adminOnly, async (req, res) => {
   try {
-    const requests = await Request.getUserRequests(req.user._id);
+    const requests = await Request.getPendingRequests();
     res.json(requests);
-  } catch (error) {
-    console.error('Get requests error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Create new request
-router.post('/', authenticate, async (req, res) => {
+// GET all requests (admin)
+router.get('/', protect, adminOnly, async (req, res) => {
+  try {
+    const requests = await Request.find()
+      .populate('user', 'username')
+      .populate('session', 'computer start_time')
+      .sort({ created_at: -1 })
+      .limit(100);
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST create request (client)
+router.post('/', protect, async (req, res) => {
   try {
     const { type, details, sessionId } = req.body;
-    
     const request = await Request.create({
-      user: req.user._id,
-      session: sessionId,
+      user: req.user.id,
+      session: sessionId || null,
       type,
-      details
+      details: details || {},
     });
-    
     res.status(201).json(request);
-  } catch (error) {
-    console.error('Create request error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 
-// Get specific request
-router.get('/:requestId', authenticate, async (req, res) => {
+// PATCH approve request
+router.patch('/:id/approved', protect, adminOnly, async (req, res) => {
   try {
-    const request = await Request.findById(req.params.requestId)
-      .populate('user', 'username full_name')
-      .populate('session');
-    
-    if (!request) {
-      return res.status(404).json({ error: 'Request not found' });
-    }
-    
-    // Check if user owns the request or is admin
-    if (request.user._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
+    const request = await Request.findById(req.params.id);
+    if (!request) return res.status(404).json({ message: 'Request not found' });
+    await request.approve(req.body.response || null);
     res.json(request);
-  } catch (error) {
-    console.error('Get request error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PATCH reject request
+router.patch('/:id/rejected', protect, adminOnly, async (req, res) => {
+  try {
+    const request = await Request.findById(req.params.id);
+    if (!request) return res.status(404).json({ message: 'Request not found' });
+    await request.reject(req.body.response || 'Request rejected');
+    res.json(request);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
