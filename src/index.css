@@ -1,64 +1,123 @@
-/* src/index.css */
-
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600&display=swap');
 
-/* ── Dark theme (default) ── */
-:root, [data-theme="dark"] {
-  --bg:          #0a0e1a;
-  --surface:     #0f1525;
-  --surface2:    #141929;
-  --border:      #1e2d4a;
-  --primary:     #00d4ff;
-  --accent:      #7c3aed;
-  --success:     #10b981;
-  --warning:     #f59e0b;
-  --danger:      #f87171;
-  --muted:       #4a5568;
-  --text:        #e2e8f0;
-  --text2:       #94a3b8;
-  --text3:       #64748b;
-  --card-bg:     #0f1525;
-  --input-bg:    #0a0e1a;
-  --tab-bg:      #0a0e1a;
-  --scanline:    rgba(0,212,255,0.012);
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 8%;
+    --foreground: 210 40% 90%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 90%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 90%;
+    --primary: 192 100% 50%;
+    --primary-foreground: 222 47% 8%;
+    --secondary: 222 47% 14%;
+    --secondary-foreground: 210 40% 90%;
+    --muted: 222 47% 14%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 262 83% 58%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 70%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 222 47% 18%;
+    --input: 222 47% 14%;
+    --ring: 192 100% 50%;
+    --success: 160 84% 39%;
+    --success-foreground: 210 40% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 8%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 210 40% 90%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 90%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 90%;
+    --primary: 192 100% 50%;
+    --primary-foreground: 222 47% 8%;
+    --secondary: 222 47% 14%;
+    --secondary-foreground: 210 40% 90%;
+    --muted: 222 47% 14%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 262 83% 58%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 70%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 222 47% 18%;
+    --input: 222 47% 14%;
+    --ring: 192 100% 50%;
+    --success: 160 84% 39%;
+    --success-foreground: 210 40% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 8%;
+  }
+
+  .light {
+    --background: 210 40% 96%;
+    --foreground: 222 47% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 8%;
+    --primary: 201 96% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 90%;
+    --secondary-foreground: 222 47% 8%;
+    --muted: 210 40% 93%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 262 83% 58%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 85%;
+    --input: 214 32% 91%;
+    --ring: 201 96% 32%;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+  }
 }
 
-/* ── Light theme ── */
-[data-theme="light"] {
-  --bg:          #f0f4f8;
-  --surface:     #ffffff;
-  --surface2:    #f8fafc;
-  --border:      #e2e8f0;
-  --primary:     #0284c7;
-  --accent:      #7c3aed;
-  --success:     #059669;
-  --warning:     #d97706;
-  --danger:      #dc2626;
-  --muted:       #9ca3af;
-  --text:        #0f172a;
-  --text2:       #475569;
-  --text3:       #94a3b8;
-  --card-bg:     #ffffff;
-  --input-bg:    #f8fafc;
-  --tab-bg:      #f1f5f9;
-  --scanline:    transparent;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+    transition: background-color 0.2s, color 0.2s;
+  }
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
-}
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Rajdhani', 'Segoe UI', sans-serif;
-}
-
-/* Scrollbar styling */
+/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--surface2); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+::-webkit-scrollbar-track { @apply bg-secondary; }
+::-webkit-scrollbar-thumb { @apply bg-border rounded; }
+::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground; }
+
+/* Neon glow utilities */
+@layer utilities {
+  .neon-text {
+    text-shadow: 0 0 20px hsl(var(--primary) / 0.5);
+  }
+  .neon-glow {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.15);
+  }
+  .glass-card {
+    @apply bg-card border border-border rounded-lg;
+  }
+  .scanlines {
+    background-image: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      hsl(var(--primary) / 0.012) 2px,
+      hsl(var(--primary) / 0.012) 4px
+    );
+  }
+}

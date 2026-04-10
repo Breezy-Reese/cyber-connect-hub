@@ -67,7 +67,7 @@ const Login: React.FC = () => {
           <div style={styles.logoIcon}>
             <Monitor size={26} color="#00d4ff" strokeWidth={1.5} />
           </div>
-          <h1 style={styles.logoTitle}>NETZONE</h1>
+          <h1 style={styles.logoTitle}>SHINESTAR</h1>
           <p style={styles.logoSub}>Cyber Café Management System</p>
         </div>
 

@@ -4,6 +4,18 @@ const router = express.Router();
 const Request = require('../models/Request');
 const { protect, adminOnly } = require('../middleware/auth');
 
+// GET current user's own requests (client)
+router.get('/my', protect, async (req, res) => {
+  try {
+    const requests = await Request.find({ user: req.user.id })
+      .sort({ created_at: -1 })
+      .limit(50);
+    res.json({ requests });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET pending requests (admin)
 router.get('/pending', protect, adminOnly, async (req, res) => {
   try {
