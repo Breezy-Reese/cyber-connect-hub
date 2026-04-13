@@ -47,7 +47,7 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/computers', computerRoutes);
-
+app.use('/api/users', require('./routes/users'));
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 

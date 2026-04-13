@@ -37,6 +37,23 @@ interface Request {
   created_at: string;
 }
 
+interface User {
+  _id: string;
+  username: string;
+  email?: string;
+  role: "client" | "admin";
+  is_online: boolean;
+  last_login?: string;
+  created_at: string;
+  active_session?: {
+    computer_name: string;
+    start_time: string;
+    remaining_time: number;
+  } | null;
+  total_sessions?: number;
+  total_spent?: number;
+}
+
 const fmt = (secs: number) => {
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
@@ -44,6 +61,14 @@ const fmt = (secs: number) => {
   return h > 0
     ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
     : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+};
+
+const timeAgo = (dateStr: string) => {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 };
 
 const statusColor: Record<string, string> = {
@@ -62,12 +87,35 @@ const AdminDashboard = () => {
   const [computers, setComputers] = useState<Computer[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [requests, setRequests] = useState<Request[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [earnings, setEarnings] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"computers" | "sessions" | "requests">("computers");
+  const [activeTab, setActiveTab] = useState<"computers" | "sessions" | "requests" | "users">("computers");
   const [tick, setTick] = useState(0);
 
+  // User tab state
+  const [userFilter, setUserFilter] = useState<"all" | "online" | "offline">("all");
+  const [userSearch, setUserSearch] = useState("");
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+  const safeJson = async (res: Response) => {
+    if (!res.ok) return null;
+    const text = await res.text();
+    try { return JSON.parse(text); } catch { return null; }
+  };
+
+  // Users are fetched separately so a missing /api/users route never
+  // pollutes the console or blocks the main data load.
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/users`, { headers });
+      if (!res.ok) return; // route not yet implemented — stay silent
+      const data = await safeJson(res);
+      if (data !== null) setUsers(data.users || data || []);
+    } catch { /* network error — ignore silently */ }
+  }, [token]);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -76,15 +124,21 @@ const AdminDashboard = () => {
         fetch(`${API}/sessions/active`, { headers }),
         fetch(`${API}/requests/pending`, { headers }),
       ]);
-      const [comp, sess, req] = await Promise.all([compRes.json(), sessRes.json(), reqRes.json()]);
-      setComputers(comp.computers || comp || []);
-      setSessions(sess.sessions || sess || []);
-      setRequests(req.requests || req || []);
-      const total = (sess.sessions || sess || []).reduce((sum: number, s: Session) => sum + (s.total_cost || 0), 0);
+      const [comp, sess, req] = await Promise.all([
+        safeJson(compRes), safeJson(sessRes), safeJson(reqRes),
+      ]);
+      if (comp !== null) setComputers(comp.computers || comp || []);
+      if (sess !== null) setSessions(sess.sessions || sess || []);
+      if (req  !== null) setRequests(req.requests || req || []);
+      const activeSessions = sess ? (sess.sessions || sess || []) : [];
+      const total = activeSessions.reduce(
+        (sum: number, s: Session) => sum + (s.total_cost || 0), 0
+      );
       setEarnings(total);
     } catch (e) { console.error("Fetch error:", e); }
     finally { setLoading(false); }
-  }, [token]);
+    fetchUsers(); // fire-and-forget — won't affect loading state
+  }, [token, fetchUsers]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
   useEffect(() => { const id = setInterval(() => setTick((t) => t + 1), 1000); return () => clearInterval(id); }, []);
@@ -107,11 +161,27 @@ const AdminDashboard = () => {
     await fetch(`${API}/computers/${id}`, { method: "PATCH", headers, body: JSON.stringify({ status }) });
     fetchAll();
   };
+  const kickUser = async (userId: string) => {
+    if (!confirm("Force logout this user?")) return;
+    await fetch(`${API}/users/${userId}/kick`, { method: "POST", headers });
+    fetchAll();
+  };
   const handleLogout = () => { logout(); navigate("/"); };
 
   const available = computers.filter((c) => c.status === "available").length;
   const inUse = computers.filter((c) => c.status === "in_use").length;
   const maintenance = computers.filter((c) => c.status === "maintenance").length;
+  const onlineUsers = users.filter((u) => u.is_online).length;
+
+  const filteredUsers = users.filter((u) => {
+    const matchSearch = u.username.toLowerCase().includes(userSearch.toLowerCase()) ||
+      (u.email || "").toLowerCase().includes(userSearch.toLowerCase());
+    const matchFilter =
+      userFilter === "all" ? true :
+      userFilter === "online" ? u.is_online :
+      !u.is_online;
+    return matchSearch && matchFilter;
+  });
 
   const C = isDark ? DARK : LIGHT;
 
@@ -145,7 +215,6 @@ const AdminDashboard = () => {
           <div style={{ ...S.liveIndicator, color: C.success }}>
             <span style={{ ...S.liveDot, background: C.success }} />LIVE
           </div>
-          {/* ── THEME TOGGLE BUTTON ── */}
           <button onClick={toggleTheme} style={{ ...S.themeBtn, border: `1px solid ${C.border}`, color: C.text2 }}>
             {isDark ? "☀ Light" : "🌙 Dark"}
           </button>
@@ -160,6 +229,7 @@ const AdminDashboard = () => {
           { label: "In Use", value: inUse, color: "#a78bfa", icon: "⚡" },
           { label: "Available", value: available, color: C.success, icon: "✓" },
           { label: "Maintenance", value: maintenance, color: C.warning, icon: "⚙" },
+          { label: "Online Users", value: onlineUsers, color: C.primary, icon: "👤" },
           { label: "Pending", value: requests.length, color: C.danger, icon: "!" },
           { label: "Earnings", value: `$${earnings.toFixed(2)}`, color: C.success, icon: "$" },
         ].map((s) => (
@@ -173,19 +243,28 @@ const AdminDashboard = () => {
 
       {/* Tabs */}
       <div style={S.tabs}>
-        {(["computers", "sessions", "requests"] as const).map((tab) => (
+        {(["computers", "sessions", "users", "requests"] as const).map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            style={{ ...S.tab, borderColor: C.border, color: activeTab === tab ? C.primary : C.muted,
+            style={{
+              ...S.tab, borderColor: C.border,
+              color: activeTab === tab ? C.primary : C.muted,
               background: activeTab === tab ? C.primaryBg : "transparent",
-              ...(activeTab === tab ? { borderColor: C.primaryBorder } : {}) }}>
-            {tab === "computers" && "🖥 "}{tab === "sessions" && "⏱ "}{tab === "requests" && "📋 "}
+              ...(activeTab === tab ? { borderColor: C.primaryBorder } : {}),
+            }}>
+            {tab === "computers" && "🖥 "}
+            {tab === "sessions" && "⏱ "}
+            {tab === "requests" && "📋 "}
+            {tab === "users" && "👥 "}
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
             {tab === "requests" && requests.length > 0 && <span style={S.badge}>{requests.length}</span>}
+            {tab === "users" && onlineUsers > 0 && (
+              <span style={{ ...S.badge, background: C.success }}>{onlineUsers}</span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Computers */}
+      {/* ── COMPUTERS ── */}
       {activeTab === "computers" && (
         <div style={S.grid}>
           {computers.length === 0 && <EmptyState text="No computers registered" color={C.muted} />}
@@ -225,14 +304,14 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Sessions */}
+      {/* ── SESSIONS ── */}
       {activeTab === "sessions" && (
         <div style={S.tableWrap}>
           {sessions.length === 0 && <EmptyState text="No active sessions" color={C.muted} />}
           {sessions.length > 0 && (
             <table style={S.table}>
               <thead>
-                <tr>{["User","PC","Started","Remaining","Cost","Actions"].map((h) => (
+                <tr>{["User", "PC", "Started", "Remaining", "Cost", "Actions"].map((h) => (
                   <th key={h} style={{ ...S.th, color: C.muted, borderBottomColor: C.border }}>{h}</th>
                 ))}</tr>
               </thead>
@@ -264,7 +343,217 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Requests */}
+      {/* ── USERS ── */}
+      {activeTab === "users" && (
+        <div style={{ padding: "0 2rem", position: "relative", zIndex: 1 }}>
+
+          {/* Search + filter bar */}
+          <div style={{ display: "flex", gap: 10, marginBottom: "1.25rem", flexWrap: "wrap" }}>
+            <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+              <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input
+                type="text"
+                placeholder="Search by username or email..."
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                style={{
+                  width: "100%", padding: "0.55rem 1rem 0.55rem 2.1rem",
+                  background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 8, color: C.text, fontSize: "0.85rem",
+                  fontFamily: "'Share Tech Mono',monospace", outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["all", "online", "offline"] as const).map((f) => (
+                <button key={f} onClick={() => setUserFilter(f)}
+                  style={{
+                    padding: "0.45rem 0.9rem", border: `1px solid ${C.border}`,
+                    borderRadius: 8, background: userFilter === f ? C.primaryBg : "transparent",
+                    color: userFilter === f ? C.primary : C.muted,
+                    borderColor: userFilter === f ? C.primaryBorder : C.border,
+                    cursor: "pointer", fontSize: "0.78rem",
+                    fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em",
+                  }}>
+                  {f === "online" && <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: C.success, marginRight: 5 }} />}
+                  {f === "offline" && <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: C.muted, marginRight: 5 }} />}
+                  {f.toUpperCase()} {f === "online" ? `(${onlineUsers})` : f === "offline" ? `(${users.length - onlineUsers})` : `(${users.length})`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* User table */}
+          {filteredUsers.length === 0 && <EmptyState text="No users found" color={C.muted} />}
+          {filteredUsers.length > 0 && (
+            <div style={{ overflowX: "auto" }}>
+              <table style={S.table}>
+                <thead>
+                  <tr>
+                    {["Status", "Username", "Email", "Role", "Active Session", "Last Login", "Total Sessions", "Spent", "Actions"].map((h) => (
+                      <th key={h} style={{ ...S.th, color: C.muted, borderBottomColor: C.border }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((u) => (
+                    <tr key={u._id}
+                      style={{ ...S.tr, borderBottomColor: C.surface2, cursor: "pointer" }}
+                      onClick={() => setSelectedUser(selectedUser?._id === u._id ? null : u)}>
+                      {/* Online dot */}
+                      <td style={{ ...S.td, textAlign: "center" }}>
+                        <span style={{
+                          display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+                          background: u.is_online ? C.success : C.muted,
+                          boxShadow: u.is_online ? `0 0 6px ${C.success}` : "none",
+                        }} />
+                      </td>
+                      {/* Username */}
+                      <td style={S.td}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{
+                            width: 28, height: 28, borderRadius: "50%",
+                            background: u.is_online ? "rgba(0,212,255,0.12)" : C.surface2,
+                            border: `1px solid ${u.is_online ? C.primaryBorder : C.border}`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "0.7rem", fontWeight: 600,
+                            color: u.is_online ? C.primary : C.muted,
+                            fontFamily: "'Share Tech Mono',monospace",
+                            flexShrink: 0,
+                          }}>
+                            {u.username.slice(0, 2).toUpperCase()}
+                          </div>
+                          <span style={{ color: u.is_online ? C.text : C.text2, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.85rem" }}>
+                            {u.username}
+                          </span>
+                        </div>
+                      </td>
+                      {/* Email */}
+                      <td style={S.td}>
+                        <span style={{ color: C.muted, fontSize: "0.8rem", fontFamily: "'Share Tech Mono',monospace" }}>
+                          {u.email || "—"}
+                        </span>
+                      </td>
+                      {/* Role */}
+                      <td style={S.td}>
+                        <span style={{
+                          padding: "0.18rem 0.55rem", borderRadius: 5, fontSize: "0.68rem",
+                          letterSpacing: "0.08em", fontFamily: "'Share Tech Mono',monospace",
+                          background: u.role === "admin" ? "rgba(124,58,237,0.12)" : C.surface2,
+                          color: u.role === "admin" ? "#a78bfa" : C.muted,
+                          border: `1px solid ${u.role === "admin" ? "rgba(124,58,237,0.3)" : C.border}`,
+                        }}>
+                          {u.role.toUpperCase()}
+                        </span>
+                      </td>
+                      {/* Active session */}
+                      <td style={S.td}>
+                        {u.active_session ? (
+                          <div>
+                            <div style={{ background: C.primaryBg, color: C.primary, border: `1px solid ${C.primaryBorder}`, padding: "0.18rem 0.5rem", borderRadius: 4, fontSize: "0.75rem", fontFamily: "'Share Tech Mono',monospace", display: "inline-block" }}>
+                              {u.active_session.computer_name}
+                            </div>
+                            <div style={{ color: C.success, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.72rem", marginTop: 2 }}>
+                              ⏱ {fmt(u.active_session.remaining_time)}
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={{ color: C.muted, fontSize: "0.78rem", fontFamily: "'Share Tech Mono',monospace" }}>—</span>
+                        )}
+                      </td>
+                      {/* Last login */}
+                      <td style={S.td}>
+                        <span style={{ color: C.muted, fontSize: "0.78rem", fontFamily: "'Share Tech Mono',monospace" }}>
+                          {u.last_login ? timeAgo(u.last_login) : "Never"}
+                        </span>
+                      </td>
+                      {/* Total sessions */}
+                      <td style={S.td}>
+                        <span style={{ color: C.text2, fontFamily: "monospace", fontSize: "0.85rem" }}>
+                          {u.total_sessions ?? 0}
+                        </span>
+                      </td>
+                      {/* Total spent */}
+                      <td style={S.td}>
+                        <span style={{ color: C.success, fontFamily: "monospace", fontSize: "0.85rem" }}>
+                          ${(u.total_spent ?? 0).toFixed(2)}
+                        </span>
+                      </td>
+                      {/* Actions */}
+                      <td style={S.td} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {u.is_online && u.role !== "admin" && (
+                            <button style={{ ...S.iconBtn, color: C.danger }} onClick={() => kickUser(u._id)}>
+                              Kick
+                            </button>
+                          )}
+                          <button style={{ ...S.iconBtn, color: C.primary }} onClick={() => setSelectedUser(selectedUser?._id === u._id ? null : u)}>
+                            {selectedUser?._id === u._id ? "Hide" : "View"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Expanded user detail panel */}
+          {selectedUser && (
+            <div style={{
+              marginTop: "1.25rem", background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 12, padding: "1.25rem",
+              borderLeft: `3px solid ${selectedUser.is_online ? C.primary : C.muted}`,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: "50%",
+                    background: selectedUser.is_online ? C.primaryBg : C.surface2,
+                    border: `2px solid ${selectedUser.is_online ? C.primary : C.border}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "1rem", fontWeight: 600, color: selectedUser.is_online ? C.primary : C.muted,
+                    fontFamily: "'Share Tech Mono',monospace",
+                  }}>
+                    {selectedUser.username.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: "1rem", color: C.text }}>{selectedUser.username}</div>
+                    <div style={{ fontSize: "0.75rem", color: C.muted, fontFamily: "'Share Tech Mono',monospace" }}>
+                      {selectedUser.email || "No email"} · Joined {new Date(selectedUser.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedUser(null)}
+                  style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: "1.1rem" }}>✕</button>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
+                {[
+                  { label: "Status", value: selectedUser.is_online ? "● Online" : "○ Offline", color: selectedUser.is_online ? C.success : C.muted },
+                  { label: "Role", value: selectedUser.role.toUpperCase(), color: selectedUser.role === "admin" ? "#a78bfa" : C.text2 },
+                  { label: "Last Login", value: selectedUser.last_login ? timeAgo(selectedUser.last_login) : "Never", color: C.text2 },
+                  { label: "Total Sessions", value: String(selectedUser.total_sessions ?? 0), color: C.primary },
+                  { label: "Total Spent", value: `$${(selectedUser.total_spent ?? 0).toFixed(2)}`, color: C.success },
+                  { label: "Active PC", value: selectedUser.active_session?.computer_name || "None", color: selectedUser.active_session ? C.primary : C.muted },
+                ].map((item) => (
+                  <div key={item.label} style={{ background: C.surface2, borderRadius: 8, padding: "0.75rem" }}>
+                    <div style={{ fontSize: "0.65rem", color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Share Tech Mono',monospace", marginBottom: 4 }}>{item.label}</div>
+                    <div style={{ fontSize: "0.95rem", fontWeight: 600, color: item.color, fontFamily: "'Share Tech Mono',monospace" }}>{item.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── REQUESTS ── */}
       {activeTab === "requests" && (
         <div style={S.requestList}>
           {requests.length === 0 && <EmptyState text="No pending requests" color={C.muted} />}
@@ -299,7 +588,6 @@ const EmptyState = ({ text, color }: { text: string; color: string }) => (
   </div>
 );
 
-// Theme colour palettes
 const DARK = {
   bg: "#0a0e1a", surface: "#0f1525", surface2: "#141929", border: "#1e2d4a",
   primary: "#00d4ff", primaryBg: "rgba(0,212,255,0.08)", primaryBorder: "rgba(0,212,255,0.3)",
@@ -329,12 +617,12 @@ const S: Record<string, React.CSSProperties> = {
   liveDot: { width: 6, height: 6, borderRadius: "50%", display: "inline-block" },
   themeBtn: { padding: "0.4rem 0.85rem", border: "1px solid", borderRadius: 6, background: "transparent", cursor: "pointer", fontFamily: "'Share Tech Mono',monospace", fontSize: "0.75rem", letterSpacing: "0.05em", transition: "all 0.2s" },
   logoutBtn: { padding: "0.4rem 0.9rem", border: "1px solid", borderRadius: 6, background: "transparent", cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", fontSize: "0.85rem", letterSpacing: "0.05em" },
-  statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12, padding: "1.5rem 2rem", position: "relative", zIndex: 1 },
+  statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, padding: "1.5rem 2rem", position: "relative", zIndex: 1 },
   statCard: { border: "1px solid", borderRadius: 12, padding: "1rem", textAlign: "center" },
   statIcon: { fontSize: "1.2rem", marginBottom: "0.5rem" },
   statValue: { fontSize: "1.8rem", fontWeight: 600, lineHeight: 1, marginBottom: "0.25rem" },
   statLabel: { fontSize: "0.68rem", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Share Tech Mono',monospace" },
-  tabs: { display: "flex", gap: 8, padding: "0 2rem 1rem", position: "relative", zIndex: 1 },
+  tabs: { display: "flex", gap: 8, padding: "0 2rem 1rem", position: "relative", zIndex: 1, flexWrap: "wrap" },
   tab: { padding: "0.5rem 1.25rem", border: "1px solid", borderRadius: 8, background: "transparent", cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", fontSize: "0.9rem", fontWeight: 500, letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: 6 },
   badge: { background: "#f87171", color: "#fff", borderRadius: "50%", width: 18, height: 18, fontSize: "0.7rem", display: "inline-flex", alignItems: "center", justifyContent: "center" },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12, padding: "0 2rem", position: "relative", zIndex: 1 },
