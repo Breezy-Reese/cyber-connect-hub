@@ -106,12 +106,10 @@ const AdminDashboard = () => {
     try { return JSON.parse(text); } catch { return null; }
   };
 
-  // Users are fetched separately so a missing /api/users route never
-  // pollutes the console or blocks the main data load.
   const fetchUsers = useCallback(async () => {
     try {
       const res = await fetch(`${API}/users`, { headers });
-      if (!res.ok) return; // route not yet implemented — stay silent
+      if (!res.ok) return;
       const data = await safeJson(res);
       if (data !== null) setUsers(data.users || data || []);
     } catch { /* network error — ignore silently */ }
@@ -137,7 +135,7 @@ const AdminDashboard = () => {
       setEarnings(total);
     } catch (e) { console.error("Fetch error:", e); }
     finally { setLoading(false); }
-    fetchUsers(); // fire-and-forget — won't affect loading state
+    fetchUsers();
   }, [token, fetchUsers]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -231,7 +229,7 @@ const AdminDashboard = () => {
           { label: "Maintenance", value: maintenance, color: C.warning, icon: "⚙" },
           { label: "Online Users", value: onlineUsers, color: C.primary, icon: "👤" },
           { label: "Pending", value: requests.length, color: C.danger, icon: "!" },
-          { label: "Earnings", value: `$${earnings.toFixed(2)}`, color: C.success, icon: "$" },
+          { label: "Earnings", value: `KSh ${earnings.toFixed(2)}`, color: C.success, icon: "KSh" },
         ].map((s) => (
           <div key={s.label} style={{ ...S.statCard, background: C.surface, borderColor: C.border }}>
             <div style={{ ...S.statIcon, color: s.color }}>{s.icon}</div>
@@ -292,7 +290,7 @@ const AdminDashboard = () => {
                 </div>
               )}
               <div style={S.pcFooter}>
-                <span style={{ ...S.pcRate, color: C.success }}>${pc.hourly_rate.toFixed(2)}/hr</span>
+                <span style={{ ...S.pcRate, color: C.success }}>KSh {pc.hourly_rate.toFixed(2)}/hr</span>
                 <div style={S.pcActions}>
                   {pc.status !== "available" && <button style={{ ...S.actionBtn, color: C.success }} onClick={() => updateComputerStatus(pc._id, "available")}>Set Available</button>}
                   {pc.status !== "maintenance" && <button style={{ ...S.actionBtn, color: C.warning }} onClick={() => updateComputerStatus(pc._id, "maintenance")}>Maintenance</button>}
@@ -326,7 +324,7 @@ const AdminDashboard = () => {
                       <td style={S.td}><span style={{ background: C.primaryBg, color: C.primary, border: `1px solid ${C.primaryBorder}`, padding: "0.2rem 0.5rem", borderRadius: 4, fontSize: "0.78rem", fontFamily: "'Share Tech Mono',monospace" }}>{s.computer?.computer_name || "—"}</span></td>
                       <td style={S.td}><span style={{ color: C.muted, fontSize: "0.8rem", fontFamily: "'Share Tech Mono',monospace" }}>{new Date(s.start_time).toLocaleTimeString()}</span></td>
                       <td style={S.td}><span style={{ fontFamily: "'Share Tech Mono',monospace", fontWeight: 600, fontSize: "1rem", color: remaining < 300 ? C.danger : C.primary }}>{fmt(remaining)}</span></td>
-                      <td style={S.td}><span style={{ color: C.success, fontFamily: "monospace" }}>${cost.toFixed(2)}</span></td>
+                      <td style={S.td}><span style={{ color: C.success, fontFamily: "monospace" }}>KSh {cost.toFixed(2)}</span></td>
                       <td style={S.td}>
                         <div style={{ display: "flex", gap: 4 }}>
                           <button style={{ ...S.iconBtn, color: C.success }} onClick={() => addTime(s._id, 30)}>+30m</button>
@@ -480,7 +478,7 @@ const AdminDashboard = () => {
                       {/* Total spent */}
                       <td style={S.td}>
                         <span style={{ color: C.success, fontFamily: "monospace", fontSize: "0.85rem" }}>
-                          ${(u.total_spent ?? 0).toFixed(2)}
+                          KSh {(u.total_spent ?? 0).toFixed(2)}
                         </span>
                       </td>
                       {/* Actions */}
@@ -539,7 +537,7 @@ const AdminDashboard = () => {
                   { label: "Role", value: selectedUser.role.toUpperCase(), color: selectedUser.role === "admin" ? "#a78bfa" : C.text2 },
                   { label: "Last Login", value: selectedUser.last_login ? timeAgo(selectedUser.last_login) : "Never", color: C.text2 },
                   { label: "Total Sessions", value: String(selectedUser.total_sessions ?? 0), color: C.primary },
-                  { label: "Total Spent", value: `$${(selectedUser.total_spent ?? 0).toFixed(2)}`, color: C.success },
+                  { label: "Total Spent", value: `KSh ${(selectedUser.total_spent ?? 0).toFixed(2)}`, color: C.success },
                   { label: "Active PC", value: selectedUser.active_session?.computer_name || "None", color: selectedUser.active_session ? C.primary : C.muted },
                 ].map((item) => (
                   <div key={item.label} style={{ background: C.surface2, borderRadius: 8, padding: "0.75rem" }}>

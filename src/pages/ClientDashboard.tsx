@@ -62,7 +62,6 @@ const ClientDashboard = () => {
 
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  // Fix: treat 404 as "no active session" instead of a silent failure
   const fetchSession = useCallback(async () => {
     try {
       const res = await fetch(`${API}/sessions/my`, { headers });
@@ -181,7 +180,11 @@ const ClientDashboard = () => {
                 </div>
               )}
               <div style={{ display: "flex", justifyContent: "space-around", marginTop: "0.75rem" }}>
-                {[["Cost so far", `$${cost.toFixed(2)}`, C.success], ["Rate", `$${session?.hourly_rate_at_start?.toFixed(2) || "--"}/hr`, C.text], ["Status", session ? "Active" : "No Session", session ? C.success : C.muted]].map(([label, val, color]) => (
+                {[
+                  ["Cost so far", `KSh ${cost.toFixed(2)}`, C.success],
+                  ["Rate", `KSh ${session?.hourly_rate_at_start?.toFixed(2) || "--"}/hr`, C.text],
+                  ["Status", session ? "Active" : "No Session", session ? C.success : C.muted]
+                ].map(([label, val, color]) => (
                   <div key={label as string} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
                     <span style={{ fontSize: "0.65rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'Share Tech Mono',monospace" }}>{label}</span>
                     <span style={{ fontSize: "0.9rem", fontWeight: 500, color: color as string }}>{val}</span>
