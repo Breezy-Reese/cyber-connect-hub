@@ -15,12 +15,12 @@ router.get('/active', protect, adminOnly, async (req, res) => {
   }
 });
 
-// GET current user's active session
+// GET current user's active session ← FIXED: req.user._id
 router.get('/my', protect, async (req, res) => {
   try {
-    const session = await Session.getUserActiveSession(req.user.id);
+    const session = await Session.getUserActiveSession(req.user._id);
     if (!session) return res.status(404).json({ message: 'No active session' });
-    res.json(session);
+    res.json({ session });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -50,6 +50,10 @@ router.post('/start', protect, adminOnly, async (req, res) => {
       current_session: session._id,
     });
 
+    // Notify via socket
+    const io = req.app.get('io');
+    if (io) io.to(`user_${userId}`).emit('session_started', session);
+
     res.status(201).json(session);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -66,6 +70,9 @@ router.post('/:id/add-time', protect, adminOnly, async (req, res) => {
     const result = session.addTime(minutes);
     await session.save();
 
+    const io = req.app.get('io');
+    if (io) io.to(`user_${session.user}`).emit('time_added', { minutes, session });
+
     res.json({ message: `Added ${minutes} minutes`, ...result, session });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -79,6 +86,10 @@ router.post('/:id/end', protect, adminOnly, async (req, res) => {
     if (!session) return res.status(404).json({ message: 'Session not found' });
 
     const ended = await session.endSession();
+
+    const io = req.app.get('io');
+    if (io) io.to(`user_${session.user}`).emit('session_ended', ended);
+
     res.json(ended);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });

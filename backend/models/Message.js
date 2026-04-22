@@ -1,61 +1,58 @@
+// backend/models/Message.js
 const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema({
-  sender: {
+  from: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  receiver: {
+  to: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    default: null // null means "to all admins"
   },
-  message: {
+  session: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Session',
+    default: null
+  },
+  text: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    maxlength: 1000
   },
-  is_read: {
+  role: {
+    type: String,
+    enum: ['client', 'admin'],
+    required: true
+  },
+  read: {
     type: Boolean,
     default: false
-  },
-  read_at: {
-    type: Date
   }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
-// Method to mark as read
-messageSchema.methods.markAsRead = async function() {
-  if (!this.is_read) {
-    this.is_read = true;
-    this.read_at = new Date();
-    await this.save();
-  }
-  return this;
-};
-
-// Static method to get conversation
-messageSchema.statics.getConversation = async function(userId1, userId2, limit = 50) {
+// Get conversation between a client and admins
+messageSchema.statics.getConversation = function(userId, limit = 50) {
   return this.find({
-    $or: [
-      { sender: userId1, receiver: userId2 },
-      { sender: userId2, receiver: userId1 }
-    ]
+    $or: [{ from: userId }, { to: userId }]
   })
-  .populate('sender', 'username full_name')
-  .populate('receiver', 'username full_name')
-  .sort({ created_at: -1 })
-  .limit(limit);
+    .populate('from', 'username role')
+    .populate('to', 'username role')
+    .sort({ created_at: 1 })
+    .limit(limit);
 };
 
-// Static method to get unread messages
-messageSchema.statics.getUnreadMessages = function(userId) {
-  return this.find({ receiver: userId, is_read: false })
-    .populate('sender', 'username full_name')
-    .sort({ created_at: -1 });
+// Get all client messages (for admin view)
+messageSchema.statics.getAllClientMessages = function() {
+  return this.find({ role: 'client' })
+    .populate('from', 'username role')
+    .sort({ created_at: -1 })
+    .limit(100);
 };
 
 module.exports = mongoose.model('Message', messageSchema);
