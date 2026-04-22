@@ -15,20 +15,17 @@ const Login: React.FC = () => {
   const [role, setRole] = useState<Role>('client');
   const [loginType, setLoginType] = useState<LoginType>('password');
 
-  // Client login
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [ticketCode, setTicketCode] = useState('');
 
-  // Admin login
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [adminRememberMe, setAdminRememberMe] = useState(false);
 
-  // Register
   const [regUsername, setRegUsername] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
@@ -36,23 +33,18 @@ const Login: React.FC = () => {
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [showRegConfirm, setShowRegConfirm] = useState(false);
 
-  // Forgot password
   const [showForgot, setShowForgot] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
-
   const [loading, setLoading] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // ── Login submit ──────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     let credentials: Record<string, string> = {};
-
     if (role === 'admin') {
       credentials = { username: adminUsername, password: adminPassword, loginType: 'password', role: 'admin' };
     } else if (loginType === 'password') {
@@ -60,9 +52,7 @@ const Login: React.FC = () => {
     } else {
       credentials = { ticketCode, loginType: 'ticket', role: 'client' };
     }
-
     const result = await login(credentials);
-
     if (result.success) {
       toast.success('Login successful!');
       navigate(result.user?.role === 'admin' ? '/admin' : '/dashboard');
@@ -72,7 +62,6 @@ const Login: React.FC = () => {
     setLoading(false);
   };
 
-  // ── Register submit ───────────────────────────────────────────────────────
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (regPassword !== regConfirmPassword) {
@@ -80,55 +69,62 @@ const Login: React.FC = () => {
       return;
     }
     setLoading(true);
-    // TODO: call your register API here
     toast.success('Account created! You can now log in.');
     setRole('client');
     setLoading(false);
   };
 
-  // ── Forgot password submit ────────────────────────────────────────────────
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // TODO: call your password-reset API here
     setResetSent(true);
     setLoading(false);
   };
 
-  // ── Forgot password overlay ───────────────────────────────────────────────
+  const accentColor = role === 'admin' ? '#7c3aed' : role === 'register' ? '#059669' : '#2563eb';
+  const accentLight = role === 'admin' ? '#ede9fe' : role === 'register' ? '#d1fae5' : '#dbeafe';
+  const accentMid = role === 'admin' ? '#8b5cf6' : role === 'register' ? '#10b981' : '#3b82f6';
+
   if (showForgot) {
     return (
-      <div style={styles.page}>
-        <div style={styles.scanlines} />
-        <div style={styles.container}>
-          <div style={styles.logoWrap}>
-            <div style={styles.logoIcon}><Monitor size={26} color="#00d4ff" strokeWidth={1.5} /></div>
-            <h1 style={styles.logoTitle}>SHINESTAR</h1>
-            <p style={styles.logoSub}>Cyber Café Management System</p>
+      <div style={S.page}>
+        <div style={S.bgDecor} />
+        <div style={S.bgDecor2} />
+        <div style={S.container}>
+          <div style={S.brandRow}>
+            <div style={{ ...S.brandIcon, background: '#dbeafe', borderColor: '#bfdbfe' }}>
+              <Monitor size={22} color="#2563eb" strokeWidth={1.8} />
+            </div>
+            <div>
+              <h1 style={S.brandName}>SHINESTAR</h1>
+              <p style={S.brandSub}>Cyber Café Management</p>
+            </div>
           </div>
-          <div style={styles.card}>
-            <div style={styles.cardGlow} />
-            <button type="button" style={styles.backBtn} onClick={() => { setShowForgot(false); setResetSent(false); }}>
-              <ArrowLeft size={14} /> Back to login
+
+          <div style={S.card}>
+            <div style={{ ...S.cardAccentBar, background: '#2563eb' }} />
+            <button type="button" style={S.backBtn} onClick={() => { setShowForgot(false); setResetSent(false); }}>
+              <ArrowLeft size={13} strokeWidth={2} />
+              <span>Back to login</span>
             </button>
-            <h2 style={styles.fpTitle}>Reset Password</h2>
-            <p style={styles.fpSub}>Enter your registered email and we'll send you a reset link.</p>
+            <h2 style={S.sectionTitle}>Reset your password</h2>
+            <p style={S.sectionSub}>Enter your registered email and we'll send you a reset link right away.</p>
 
             {resetSent ? (
-              <div style={styles.successBox}>
-                ✓ Reset link sent! Check your inbox.
+              <div style={S.successBox}>
+                <span style={S.successIcon}>✓</span>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 600, color: '#065f46', fontSize: '0.9rem' }}>Reset link sent!</p>
+                  <p style={{ margin: 0, color: '#047857', fontSize: '0.8rem', marginTop: 2 }}>Check your inbox and follow the instructions.</p>
+                </div>
               </div>
             ) : (
-              <form onSubmit={handleForgotPassword} style={styles.form}>
-                <Field label="Email Address" icon={<Mail size={14} />}>
-                  <input
-                    type="email" required style={styles.input}
-                    placeholder="you@example.com"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                  />
+              <form onSubmit={handleForgotPassword} style={S.form}>
+                <Field label="Email Address" icon={<Mail size={13} color="#94a3b8" />} accent="#2563eb">
+                  <input type="email" required style={S.input} placeholder="you@example.com"
+                    value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} />
                 </Field>
-                <button type="submit" disabled={loading} style={{ ...styles.btn, ...styles.btnClient, ...(loading ? styles.btnDisabled : {}) }}>
+                <button type="submit" disabled={loading} style={{ ...S.submitBtn, background: '#2563eb', opacity: loading ? 0.6 : 1 }}>
                   {loading ? 'Sending...' : 'Send Reset Link →'}
                 </button>
               </form>
@@ -140,110 +136,118 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.scanlines} />
-      <div style={styles.container}>
+    <div style={S.page}>
+      <div style={S.bgDecor} />
+      <div style={S.bgDecor2} />
 
-        {/* Logo */}
-        <div style={styles.logoWrap}>
-          <div style={styles.logoIcon}><Monitor size={26} color="#00d4ff" strokeWidth={1.5} /></div>
-          <h1 style={styles.logoTitle}>SHINESTAR</h1>
-          <p style={styles.logoSub}>Cyber Café Management System</p>
+      <div style={S.container}>
+        {/* Brand */}
+        <div style={S.brandRow}>
+          <div style={{ ...S.brandIcon, background: accentLight, borderColor: `${accentColor}33` }}>
+            <Monitor size={22} color={accentColor} strokeWidth={1.8} />
+          </div>
+          <div>
+            <h1 style={{ ...S.brandName, color: accentColor }}>{role === 'admin' ? 'SHINESTAR ADMIN' : 'SHINESTAR'}</h1>
+            <p style={S.brandSub}>Cyber Café Management System</p>
+          </div>
         </div>
 
         {/* Card */}
-        <div style={styles.card}>
-          <div style={styles.cardGlow} />
+        <div style={S.card}>
+          <div style={{ ...S.cardAccentBar, background: `linear-gradient(90deg, ${accentColor}, ${accentMid})` }} />
 
           {/* Role tabs */}
-          <div style={styles.tabs}>
-            <button type="button" onClick={() => setRole('client')}
-              style={{ ...styles.tab, ...(role === 'client' ? styles.tabActiveClient : {}) }}>
-              <Wifi size={13} />&nbsp;Client
-            </button>
-            <button type="button" onClick={() => setRole('register')}
-              style={{ ...styles.tab, ...(role === 'register' ? styles.tabActiveReg : {}) }}>
-              <UserPlus size={13} />&nbsp;Register
-            </button>
-            <button type="button" onClick={() => setRole('admin')}
-              style={{ ...styles.tab, ...(role === 'admin' ? styles.tabActiveAdmin : {}) }}>
-              <Shield size={13} />&nbsp;Admin
-            </button>
+          <div style={S.tabs}>
+            {([
+              { key: 'client', icon: <Wifi size={13} strokeWidth={2} />, label: 'Client' },
+              { key: 'register', icon: <UserPlus size={13} strokeWidth={2} />, label: 'Register' },
+              { key: 'admin', icon: <Shield size={13} strokeWidth={2} />, label: 'Admin' },
+            ] as const).map((t) => {
+              const isActive = role === t.key;
+              const tc = t.key === 'admin' ? '#7c3aed' : t.key === 'register' ? '#059669' : '#2563eb';
+              const tl = t.key === 'admin' ? '#ede9fe' : t.key === 'register' ? '#d1fae5' : '#dbeafe';
+              return (
+                <button key={t.key} type="button" onClick={() => setRole(t.key)}
+                  style={{
+                    ...S.tab,
+                    background: isActive ? tl : 'transparent',
+                    color: isActive ? tc : '#94a3b8',
+                    borderColor: isActive ? `${tc}55` : 'transparent',
+                    fontWeight: isActive ? 600 : 400,
+                  }}>
+                  {t.icon}&nbsp;{t.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Mode badge */}
-          {role === 'client' && (
-            <div style={styles.badgeClient}>
-              <span style={styles.dotClient} />
-              Client portal — public access
-            </div>
-          )}
-          {role === 'admin' && (
-            <div style={styles.badgeAdmin}>
-              <span style={styles.dotAdmin} />
-              Admin panel — restricted access
-            </div>
-          )}
-          {role === 'register' && (
-            <div style={styles.badgeReg}>
-              <span style={styles.dotReg} />
-              New account — create your profile
-            </div>
-          )}
+          {/* Badge */}
+          <div style={{ ...S.badge, background: accentLight, borderColor: `${accentColor}33`, color: accentColor }}>
+            <span style={{ ...S.badgeDot, background: accentColor }} />
+            {role === 'client' && 'Client portal — public access'}
+            {role === 'admin' && 'Admin panel — restricted access'}
+            {role === 'register' && 'New account — create your profile'}
+          </div>
 
           {/* ── CLIENT ── */}
           {role === 'client' && (
-            <form onSubmit={handleSubmit} style={styles.form}>
-              <div style={styles.subTabs}>
-                <button type="button" onClick={() => setLoginType('password')}
-                  style={{ ...styles.subTab, ...(loginType === 'password' ? styles.subTabActive : {}) }}>
-                  <KeyRound size={11} /> Password
-                </button>
-                <button type="button" onClick={() => setLoginType('ticket')}
-                  style={{ ...styles.subTab, ...(loginType === 'ticket' ? styles.subTabActive : {}) }}>
-                  <Ticket size={11} /> Ticket Code
-                </button>
+            <form onSubmit={handleSubmit} style={S.form}>
+              <div style={S.subTabs}>
+                {([
+                  { key: 'password', icon: <KeyRound size={11} strokeWidth={2} />, label: 'Password' },
+                  { key: 'ticket', icon: <Ticket size={11} strokeWidth={2} />, label: 'Ticket Code' },
+                ] as const).map((t) => (
+                  <button key={t.key} type="button" onClick={() => setLoginType(t.key)}
+                    style={{
+                      ...S.subTab,
+                      background: loginType === t.key ? '#dbeafe' : '#f8fafc',
+                      color: loginType === t.key ? '#2563eb' : '#94a3b8',
+                      borderColor: loginType === t.key ? '#bfdbfe' : '#e2e8f0',
+                      fontWeight: loginType === t.key ? 600 : 400,
+                    }}>
+                    {t.icon}&nbsp;{t.label}
+                  </button>
+                ))}
               </div>
 
               {loginType === 'password' ? (
                 <>
-                  <Field label="Username" icon={<User size={14} />}>
-                    <input type="text" required style={styles.input} placeholder="Enter username"
+                  <Field label="Username" icon={<User size={13} color="#94a3b8" />} accent="#2563eb">
+                    <input type="text" required style={S.input} placeholder="Enter your username"
                       value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
                   </Field>
-                  <Field label="Password" icon={<Lock size={14} />}>
-                    <div style={styles.inputWrap}>
-                      <input
-                        type={showPassword ? 'text' : 'password'} required
-                        style={{ ...styles.input, paddingRight: '2.5rem' }}
-                        placeholder="••••••••" value={password}
-                        onChange={(e) => setPassword(e.target.value)} autoComplete="current-password"
-                      />
-                      <button type="button" style={styles.eyeBtn} onClick={() => setShowPassword(!showPassword)}>
-                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  <Field label="Password" icon={<Lock size={13} color="#94a3b8" />} accent="#2563eb">
+                    <div style={S.inputWrap}>
+                      <input type={showPassword ? 'text' : 'password'} required
+                        style={{ ...S.input, paddingRight: '2.8rem' }} placeholder="••••••••"
+                        value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+                      <button type="button" style={S.eyeBtn} onClick={() => setShowPassword(!showPassword)}>
+                        {showPassword ? <EyeOff size={15} color="#94a3b8" /> : <Eye size={15} color="#94a3b8" />}
                       </button>
                     </div>
                   </Field>
-                  <div style={styles.rememberRow}>
-                    <label style={styles.rememberLabel}>
-                      <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
-                      &nbsp;Remember me
+                  <div style={S.rememberRow}>
+                    <label style={S.rememberLabel}>
+                      <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)}
+                        style={{ accentColor: '#2563eb', width: 14, height: 14 }} />
+                      <span>Remember me</span>
                     </label>
-                    <button type="button" style={styles.forgotBtn} onClick={() => setShowForgot(true)}>
+                    <button type="button" style={{ ...S.forgotBtn, color: '#2563eb' }} onClick={() => setShowForgot(true)}>
                       Forgot password?
                     </button>
                   </div>
                 </>
               ) : (
-                <Field label="Ticket Code" icon={<Ticket size={14} />}>
-                  <input type="text" required style={styles.input} placeholder="e.g. TKT-A3F9"
-                    value={ticketCode} onChange={(e) => setTicketCode(e.target.value.toUpperCase())} />
-                  <p style={styles.hint}>Enter the code printed on your session ticket</p>
+                <Field label="Ticket Code" icon={<Ticket size={13} color="#94a3b8" />} accent="#2563eb">
+                  <input type="text" required style={{ ...S.input, letterSpacing: '0.15em', fontWeight: 600 }}
+                    placeholder="e.g. TKT-A3F9" value={ticketCode}
+                    onChange={(e) => setTicketCode(e.target.value.toUpperCase())} />
+                  <p style={S.hint}>Enter the code printed on your session ticket</p>
                 </Field>
               )}
 
               <button type="submit" disabled={loading}
-                style={{ ...styles.btn, ...styles.btnClient, ...(loading ? styles.btnDisabled : {}) }}>
+                style={{ ...S.submitBtn, background: '#2563eb', opacity: loading ? 0.6 : 1 }}>
                 {loading ? 'Connecting...' : 'Start Session →'}
               </button>
             </form>
@@ -251,43 +255,52 @@ const Login: React.FC = () => {
 
           {/* ── REGISTER ── */}
           {role === 'register' && (
-            <form onSubmit={handleRegister} style={styles.form}>
-              <Field label="Username" icon={<User size={14} />}>
-                <input type="text" required style={styles.input} placeholder="Choose a username"
-                  value={regUsername} onChange={(e) => setRegUsername(e.target.value)} autoComplete="username" />
-              </Field>
-              <Field label="Email Address" icon={<Mail size={14} />}>
-                <input type="email" required style={styles.input} placeholder="you@example.com"
-                  value={regEmail} onChange={(e) => setRegEmail(e.target.value)} autoComplete="email" />
-              </Field>
-              <Field label="Password" icon={<Lock size={14} />}>
-                <div style={styles.inputWrap}>
-                  <input
-                    type={showRegPassword ? 'text' : 'password'} required
-                    style={{ ...styles.input, paddingRight: '2.5rem' }}
-                    placeholder="••••••••" value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)} autoComplete="new-password"
-                  />
-                  <button type="button" style={styles.eyeBtn} onClick={() => setShowRegPassword(!showRegPassword)}>
-                    {showRegPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+            <form onSubmit={handleRegister} style={S.form}>
+              <div style={S.twoCol}>
+                <Field label="Username" icon={<User size={13} color="#94a3b8" />} accent="#059669">
+                  <input type="text" required style={S.input} placeholder="Choose a username"
+                    value={regUsername} onChange={(e) => setRegUsername(e.target.value)} autoComplete="username" />
+                </Field>
+                <Field label="Email Address" icon={<Mail size={13} color="#94a3b8" />} accent="#059669">
+                  <input type="email" required style={S.input} placeholder="you@example.com"
+                    value={regEmail} onChange={(e) => setRegEmail(e.target.value)} autoComplete="email" />
+                </Field>
+              </div>
+              <Field label="Password" icon={<Lock size={13} color="#94a3b8" />} accent="#059669">
+                <div style={S.inputWrap}>
+                  <input type={showRegPassword ? 'text' : 'password'} required
+                    style={{ ...S.input, paddingRight: '2.8rem' }} placeholder="••••••••"
+                    value={regPassword} onChange={(e) => setRegPassword(e.target.value)} autoComplete="new-password" />
+                  <button type="button" style={S.eyeBtn} onClick={() => setShowRegPassword(!showRegPassword)}>
+                    {showRegPassword ? <EyeOff size={15} color="#94a3b8" /> : <Eye size={15} color="#94a3b8" />}
                   </button>
                 </div>
               </Field>
-              <Field label="Confirm Password" icon={<Lock size={14} />}>
-                <div style={styles.inputWrap}>
-                  <input
-                    type={showRegConfirm ? 'text' : 'password'} required
-                    style={{ ...styles.input, paddingRight: '2.5rem' }}
-                    placeholder="••••••••" value={regConfirmPassword}
-                    onChange={(e) => setRegConfirmPassword(e.target.value)} autoComplete="new-password"
-                  />
-                  <button type="button" style={styles.eyeBtn} onClick={() => setShowRegConfirm(!showRegConfirm)}>
-                    {showRegConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
+              <Field label="Confirm Password" icon={<Lock size={13} color="#94a3b8" />} accent="#059669">
+                <div style={S.inputWrap}>
+                  <input type={showRegConfirm ? 'text' : 'password'} required
+                    style={{ ...S.input, paddingRight: '2.8rem' }} placeholder="••••••••"
+                    value={regConfirmPassword} onChange={(e) => setRegConfirmPassword(e.target.value)} autoComplete="new-password" />
+                  <button type="button" style={S.eyeBtn} onClick={() => setShowRegConfirm(!showRegConfirm)}>
+                    {showRegConfirm ? <EyeOff size={15} color="#94a3b8" /> : <Eye size={15} color="#94a3b8" />}
                   </button>
                 </div>
               </Field>
+
+              {/* Password match indicator */}
+              {regConfirmPassword.length > 0 && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.75rem',
+                  fontSize: '0.75rem', fontFamily: "'DM Mono', monospace",
+                  color: regPassword === regConfirmPassword ? '#059669' : '#dc2626',
+                }}>
+                  <span>{regPassword === regConfirmPassword ? '✓' : '✗'}</span>
+                  {regPassword === regConfirmPassword ? 'Passwords match' : 'Passwords do not match'}
+                </div>
+              )}
+
               <button type="submit" disabled={loading}
-                style={{ ...styles.btn, ...styles.btnReg, ...(loading ? styles.btnDisabled : {}) }}>
+                style={{ ...S.submitBtn, background: '#059669', opacity: loading ? 0.6 : 1 }}>
                 {loading ? 'Creating Account...' : 'Create Account →'}
               </button>
             </form>
@@ -295,129 +308,268 @@ const Login: React.FC = () => {
 
           {/* ── ADMIN ── */}
           {role === 'admin' && (
-            <form onSubmit={handleSubmit} style={styles.form}>
-              <div style={styles.warnBox}>
-                <AlertTriangle size={14} color="#f59e0b" />
-                <span>Authorized personnel only. Access is logged.</span>
+            <form onSubmit={handleSubmit} style={S.form}>
+              <div style={S.warnBox}>
+                <AlertTriangle size={14} color="#d97706" strokeWidth={2} />
+                <span>Authorized personnel only. All access is logged and monitored.</span>
               </div>
-              <Field label="Admin Username" icon={<User size={14} />}>
-                <input type="text" required style={styles.input} placeholder="admin"
+              <Field label="Admin Username" icon={<User size={13} color="#94a3b8" />} accent="#7c3aed">
+                <input type="text" required style={S.input} placeholder="Enter admin username"
                   value={adminUsername} onChange={(e) => setAdminUsername(e.target.value)} autoComplete="username" />
               </Field>
-              <Field label="Password" icon={<Lock size={14} />}>
-                <div style={styles.inputWrap}>
-                  <input
-                    type={showAdminPassword ? 'text' : 'password'} required
-                    style={{ ...styles.input, paddingRight: '2.5rem' }}
-                    placeholder="••••••••" value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)} autoComplete="current-password"
-                  />
-                  <button type="button" style={styles.eyeBtn} onClick={() => setShowAdminPassword(!showAdminPassword)}>
-                    {showAdminPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              <Field label="Password" icon={<Lock size={13} color="#94a3b8" />} accent="#7c3aed">
+                <div style={S.inputWrap}>
+                  <input type={showAdminPassword ? 'text' : 'password'} required
+                    style={{ ...S.input, paddingRight: '2.8rem' }} placeholder="••••••••"
+                    value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} autoComplete="current-password" />
+                  <button type="button" style={S.eyeBtn} onClick={() => setShowAdminPassword(!showAdminPassword)}>
+                    {showAdminPassword ? <EyeOff size={15} color="#94a3b8" /> : <Eye size={15} color="#94a3b8" />}
                   </button>
                 </div>
               </Field>
-              <div style={styles.rememberRow}>
-                <label style={styles.rememberLabel}>
-                  <input type="checkbox" checked={adminRememberMe} onChange={(e) => setAdminRememberMe(e.target.checked)} />
-                  &nbsp;Remember me
+              <div style={S.rememberRow}>
+                <label style={S.rememberLabel}>
+                  <input type="checkbox" checked={adminRememberMe} onChange={(e) => setAdminRememberMe(e.target.checked)}
+                    style={{ accentColor: '#7c3aed', width: 14, height: 14 }} />
+                  <span>Remember me</span>
                 </label>
               </div>
               <button type="submit" disabled={loading}
-                style={{ ...styles.btn, ...styles.btnAdmin, ...(loading ? styles.btnDisabled : {}) }}>
+                style={{ ...S.submitBtn, background: '#7c3aed', opacity: loading ? 0.6 : 1 }}>
                 {loading ? 'Verifying...' : 'Access Admin Panel →'}
               </button>
             </form>
           )}
 
-          <p style={styles.footer}>
-            {role === 'client' && 'Session in progress? Contact the admin for assistance.'}
-            {role === 'admin' && 'Admin access is logged and monitored.'}
-            {role === 'register' && 'Already have an account? Switch to Client Login.'}
+          <p style={S.footer}>
+            {role === 'client' && 'Need help? Contact the admin at the front desk.'}
+            {role === 'admin' && 'Admin access is logged and monitored at all times.'}
+            {role === 'register' && 'Already have an account? Switch to Client Login above.'}
           </p>
         </div>
+
+        <p style={S.copyright}>© {new Date().getFullYear()} Shinestar Cyber Café · All rights reserved</p>
       </div>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+        * { box-sizing: border-box; }
+        input:focus { outline: none; }
+        button { transition: all 0.18s ease; }
+        button:hover:not(:disabled) { filter: brightness(0.95); transform: translateY(-1px); }
+        button:active:not(:disabled) { transform: translateY(0); }
+        input:focus { border-color: currentColor !important; box-shadow: 0 0 0 3px rgba(37,99,235,0.08); }
+      `}</style>
     </div>
   );
 };
 
 /* ── Field helper ── */
-const Field: React.FC<{ label: string; icon: React.ReactNode; children: React.ReactNode }> = ({ label, icon, children }) => (
-  <div style={styles.field}>
-    <label style={styles.label}>{icon}&nbsp;{label}</label>
-    {children}
+const Field: React.FC<{ label: string; icon: React.ReactNode; children: React.ReactNode; accent: string }> = ({ label, icon, children, accent }) => (
+  <div style={{ marginBottom: '1rem' }}>
+    <label style={{
+      display: 'flex', alignItems: 'center', gap: 5,
+      fontSize: '0.72rem', color: '#64748b', letterSpacing: '0.08em',
+      textTransform: 'uppercase', marginBottom: '0.4rem',
+      fontFamily: "'DM Mono', monospace", fontWeight: 500,
+    }}>
+      {icon}&nbsp;{label}
+    </label>
+    <div style={{ position: 'relative' }}>
+      {React.cloneElement(children as React.ReactElement, {
+        style: {
+          ...(children as React.ReactElement).props.style,
+          // pass accent color as CSS variable for focus ring
+          ['--accent' as string]: accent,
+        }
+      })}
+    </div>
   </div>
 );
 
 /* ── Styles ── */
-const styles: Record<string, React.CSSProperties> = {
+const S: Record<string, React.CSSProperties> = {
   page: {
     minHeight: '100vh',
-    background: '#0a0e1a',
+    background: 'linear-gradient(135deg, #f0f4ff 0%, #fafafa 50%, #f0fdf4 100%)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: '1rem',
-    fontFamily: "'Rajdhani', 'Segoe UI', sans-serif",
-    color: '#e2e8f0',
+    padding: '1.5rem 1rem',
+    fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
+    color: '#0f172a',
     position: 'relative', overflow: 'hidden',
   },
-  scanlines: {
-    position: 'fixed', inset: 0,
-    backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.015) 2px, rgba(0,212,255,0.015) 4px)',
-    pointerEvents: 'none', zIndex: 0,
+  bgDecor: {
+    position: 'fixed', top: '-20%', right: '-10%',
+    width: 500, height: 500, borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(37,99,235,0.06) 0%, transparent 70%)',
+    pointerEvents: 'none',
   },
-  container: { width: '100%', maxWidth: 440, position: 'relative', zIndex: 1 },
-  logoWrap: { textAlign: 'center', marginBottom: '1.75rem' },
-  logoIcon: {
-    width: 52, height: 52, borderRadius: 12,
-    background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.4)',
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.6rem',
+  bgDecor2: {
+    position: 'fixed', bottom: '-15%', left: '-8%',
+    width: 400, height: 400, borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(5,150,105,0.05) 0%, transparent 70%)',
+    pointerEvents: 'none',
   },
-  logoTitle: { fontSize: '1.7rem', fontWeight: 600, letterSpacing: '0.15em', color: '#00d4ff', textShadow: '0 0 24px rgba(0,212,255,0.4)', margin: 0 },
-  logoSub: { fontSize: '0.72rem', color: '#64748b', letterSpacing: '0.18em', textTransform: 'uppercase', fontFamily: "'Share Tech Mono', monospace", marginTop: '0.25rem' },
-  card: { background: '#0f1525', border: '1px solid #1e2d4a', borderRadius: 16, padding: '1.75rem', position: 'relative', overflow: 'hidden' },
-  cardGlow: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(0,212,255,0.6), transparent)' },
-  tabs: { display: 'flex', gap: 6, background: '#0a0e1a', borderRadius: 10, padding: 4, border: '1px solid #1e2d4a', marginBottom: '1.25rem' },
+  container: {
+    width: '100%', maxWidth: 460,
+    position: 'relative', zIndex: 1,
+    display: 'flex', flexDirection: 'column', gap: '1.25rem',
+  },
+  brandRow: {
+    display: 'flex', alignItems: 'center', gap: '0.85rem',
+    padding: '0 0.25rem',
+  },
+  brandIcon: {
+    width: 46, height: 46, borderRadius: 12, border: '1.5px solid',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+  },
+  brandName: {
+    fontSize: '1.35rem', fontWeight: 600, letterSpacing: '0.12em',
+    margin: 0, fontFamily: "'DM Mono', monospace",
+  },
+  brandSub: {
+    fontSize: '0.7rem', color: '#94a3b8', letterSpacing: '0.06em',
+    margin: 0, fontFamily: "'DM Mono', monospace",
+  },
+  card: {
+    background: '#ffffff',
+    border: '1px solid #e8edf5',
+    borderRadius: 20,
+    padding: '2rem',
+    boxShadow: '0 4px 24px rgba(15,23,42,0.07), 0 1px 4px rgba(15,23,42,0.04)',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  cardAccentBar: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+    borderRadius: '20px 20px 0 0',
+  },
+  tabs: {
+    display: 'flex', gap: 4,
+    background: '#f8fafc', borderRadius: 12, padding: 4,
+    border: '1px solid #e8edf5', marginBottom: '1.25rem',
+  },
   tab: {
-    flex: 1, padding: '0.5rem',
-    borderWidth: '1px', borderStyle: 'solid', borderColor: 'transparent', borderRadius: 8,
-    fontFamily: "'Rajdhani', sans-serif", fontSize: '0.82rem', fontWeight: 500, letterSpacing: '0.05em',
-    cursor: 'pointer', transition: 'all 0.2s', background: 'transparent', color: '#64748b',
+    flex: 1, padding: '0.5rem 0.25rem',
+    border: '1.5px solid', borderRadius: 9,
+    fontFamily: "'DM Sans', sans-serif", fontSize: '0.82rem',
+    letterSpacing: '0.02em', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+    transition: 'all 0.18s ease',
   },
-  tabActiveClient: { background: 'rgba(0,212,255,0.1)',    color: '#00d4ff', borderColor: 'rgba(0,212,255,0.3)' },
-  tabActiveAdmin:  { background: 'rgba(124,58,237,0.15)',  color: '#a78bfa', borderColor: 'rgba(124,58,237,0.4)' },
-  tabActiveReg:    { background: 'rgba(16,185,129,0.12)',  color: '#34d399', borderColor: 'rgba(16,185,129,0.35)' },
-  badgeClient: { display: 'flex', alignItems: 'center', gap: 8, padding: '0.55rem 0.9rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase' as const, fontFamily: "'Share Tech Mono', monospace", background: 'rgba(0,212,255,0.06)', border: '1px solid rgba(0,212,255,0.2)', color: '#00d4ff' },
-  badgeAdmin:  { display: 'flex', alignItems: 'center', gap: 8, padding: '0.55rem 0.9rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase' as const, fontFamily: "'Share Tech Mono', monospace", background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.35)', color: '#a78bfa' },
-  badgeReg:    { display: 'flex', alignItems: 'center', gap: 8, padding: '0.55rem 0.9rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase' as const, fontFamily: "'Share Tech Mono', monospace", background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399' },
-  dotClient: { display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#00d4ff', flexShrink: 0 },
-  dotAdmin:  { display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', flexShrink: 0 },
-  dotReg:    { display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#34d399', flexShrink: 0 },
-  subTabs: { display: 'flex', gap: 6, marginBottom: '1.25rem' },
-  subTab: { flex: 1, padding: '0.4rem', borderRadius: 6, fontSize: '0.75rem', fontFamily: "'Share Tech Mono', monospace", cursor: 'pointer', borderWidth: '1px', borderStyle: 'solid', borderColor: '#1e2d4a', background: 'transparent', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, letterSpacing: '0.05em' },
-  subTabActive: { borderColor: 'rgba(0,212,255,0.4)', background: 'rgba(0,212,255,0.08)', color: '#00d4ff' },
+  badge: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    padding: '0.5rem 0.85rem', borderRadius: 10,
+    marginBottom: '1.25rem', fontSize: '0.72rem',
+    letterSpacing: '0.06em', textTransform: 'uppercase' as const,
+    fontFamily: "'DM Mono', monospace", border: '1px solid',
+    fontWeight: 500,
+  },
+  badgeDot: {
+    display: 'inline-block', width: 6, height: 6,
+    borderRadius: '50%', flexShrink: 0,
+  },
+  subTabs: {
+    display: 'flex', gap: 6, marginBottom: '1.25rem',
+  },
+  subTab: {
+    flex: 1, padding: '0.45rem', borderRadius: 8,
+    fontSize: '0.75rem', fontFamily: "'DM Mono', monospace",
+    cursor: 'pointer', border: '1.5px solid',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+    letterSpacing: '0.04em', transition: 'all 0.18s ease',
+  },
   form: { display: 'flex', flexDirection: 'column' },
-  field: { marginBottom: '1rem' },
-  label: { display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.72rem', color: '#64748b', letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: '0.35rem', fontFamily: "'Share Tech Mono', monospace" },
+  twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' },
+  input: {
+    width: '100%', padding: '0.65rem 0.9rem',
+    background: '#f8fafc', border: '1.5px solid #e2e8f0',
+    borderRadius: 10, color: '#0f172a',
+    fontFamily: "'DM Sans', sans-serif", fontSize: '0.9rem',
+    outline: 'none', boxSizing: 'border-box' as const,
+    transition: 'border-color 0.18s, box-shadow 0.18s',
+  },
   inputWrap: { position: 'relative', display: 'flex', alignItems: 'center' },
-  input: { width: '100%', padding: '0.65rem 1rem', background: '#0a0e1a', border: '1px solid #1e2d4a', borderRadius: 8, color: '#e2e8f0', fontFamily: "'Share Tech Mono', monospace", fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' as const, transition: 'border-color 0.2s' },
-  eyeBtn: { position: 'absolute', right: 10, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 4, display: 'flex', alignItems: 'center' },
-  rememberRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' },
-  rememberLabel: { display: 'flex', alignItems: 'center', fontSize: '0.75rem', color: '#64748b', cursor: 'pointer', fontFamily: "'Share Tech Mono', monospace", letterSpacing: '0.05em' },
-  forgotBtn: { background: 'none', border: 'none', cursor: 'pointer', color: '#00d4ff', fontSize: '0.75rem', fontFamily: "'Share Tech Mono', monospace", textDecoration: 'underline', textUnderlineOffset: 2 },
-  hint: { fontSize: '0.7rem', color: '#4a5568', fontFamily: "'Share Tech Mono', monospace", marginTop: '0.3rem', letterSpacing: '0.05em' },
-  warnBox: { background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '0.55rem 0.85rem', marginBottom: '1rem', fontSize: '0.75rem', color: '#f59e0b', fontFamily: "'Share Tech Mono', monospace", display: 'flex', alignItems: 'center', gap: 8, letterSpacing: '0.04em' },
-  btn: { width: '100%', padding: '0.75rem', border: 'none', borderRadius: 8, fontFamily: "'Rajdhani', sans-serif", fontSize: '1rem', fontWeight: 600, letterSpacing: '0.1em', cursor: 'pointer', transition: 'all 0.2s', marginTop: '0.5rem', textTransform: 'uppercase' as const },
-  btnClient: { background: 'linear-gradient(90deg, #0284c7, #00d4ff)', color: '#0a0e1a' },
-  btnAdmin:  { background: 'linear-gradient(90deg, #5b21b6, #7c3aed)', color: '#fff' },
-  btnReg:    { background: 'linear-gradient(90deg, #065f46, #10b981)', color: '#fff' },
-  btnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
-  footer: { textAlign: 'center', marginTop: '1.25rem', fontSize: '0.7rem', color: '#374151', fontFamily: "'Share Tech Mono', monospace", letterSpacing: '0.05em' },
-  // Forgot password styles
-  backBtn: { background: 'none', border: 'none', color: '#00d4ff', cursor: 'pointer', fontSize: '0.78rem', marginBottom: '1.2rem', display: 'flex', alignItems: 'center', gap: 4, fontFamily: "'Share Tech Mono', monospace" },
-  fpTitle: { fontSize: '1.1rem', fontWeight: 600, color: '#e2e8f0', letterSpacing: '0.05em', marginBottom: '0.3rem' },
-  fpSub: { fontSize: '0.75rem', color: '#64748b', marginBottom: '1.25rem', fontFamily: "'Share Tech Mono', monospace", lineHeight: 1.5 },
-  successBox: { background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: '0.75rem 1rem', fontSize: '0.78rem', color: '#34d399', fontFamily: "'Share Tech Mono', monospace', marginTop: '0.75rem" },
+  eyeBtn: {
+    position: 'absolute', right: 10, background: 'none',
+    border: 'none', cursor: 'pointer', padding: 4,
+    display: 'flex', alignItems: 'center',
+  },
+  rememberRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: '1rem',
+  },
+  rememberLabel: {
+    display: 'flex', alignItems: 'center', gap: 7,
+    fontSize: '0.8rem', color: '#64748b', cursor: 'pointer',
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  forgotBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: '0.8rem', fontFamily: "'DM Sans', sans-serif",
+    textDecoration: 'underline', textUnderlineOffset: 2,
+    padding: 0,
+  },
+  hint: {
+    fontSize: '0.72rem', color: '#94a3b8',
+    fontFamily: "'DM Mono', monospace", marginTop: '0.35rem',
+    letterSpacing: '0.03em',
+  },
+  warnBox: {
+    background: '#fffbeb', border: '1.5px solid #fde68a',
+    borderRadius: 10, padding: '0.6rem 0.9rem', marginBottom: '1rem',
+    fontSize: '0.78rem', color: '#92400e',
+    fontFamily: "'DM Sans', sans-serif",
+    display: 'flex', alignItems: 'center', gap: 8,
+  },
+  submitBtn: {
+    width: '100%', padding: '0.8rem',
+    border: 'none', borderRadius: 10,
+    fontFamily: "'DM Sans', sans-serif",
+    fontSize: '0.95rem', fontWeight: 600,
+    letterSpacing: '0.04em', cursor: 'pointer',
+    color: '#ffffff', marginTop: '0.5rem',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+    transition: 'all 0.18s ease',
+  },
+  footer: {
+    textAlign: 'center', marginTop: '1.25rem',
+    fontSize: '0.73rem', color: '#94a3b8',
+    fontFamily: "'DM Sans', sans-serif",
+    letterSpacing: '0.02em',
+  },
+  backBtn: {
+    background: 'none', border: 'none', color: '#64748b',
+    cursor: 'pointer', fontSize: '0.8rem', marginBottom: '1.25rem',
+    display: 'flex', alignItems: 'center', gap: 5,
+    fontFamily: "'DM Sans', sans-serif", padding: 0,
+  },
+  sectionTitle: {
+    fontSize: '1.15rem', fontWeight: 600, color: '#0f172a',
+    letterSpacing: '0.01em', marginBottom: '0.3rem', marginTop: 0,
+  },
+  sectionSub: {
+    fontSize: '0.8rem', color: '#64748b', marginBottom: '1.5rem',
+    fontFamily: "'DM Sans', sans-serif", lineHeight: 1.6,
+  },
+  successBox: {
+    background: '#f0fdf4', border: '1.5px solid #bbf7d0',
+    borderRadius: 10, padding: '0.9rem 1rem',
+    display: 'flex', alignItems: 'flex-start', gap: 10,
+  },
+  successIcon: {
+    width: 24, height: 24, borderRadius: '50%',
+    background: '#dcfce7', border: '1.5px solid #86efac',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '0.75rem', color: '#16a34a', fontWeight: 700,
+    flexShrink: 0,
+  },
+  copyright: {
+    textAlign: 'center', fontSize: '0.68rem',
+    color: '#cbd5e1', fontFamily: "'DM Mono', monospace",
+    letterSpacing: '0.04em',
+  },
 };
 
 export default Login;

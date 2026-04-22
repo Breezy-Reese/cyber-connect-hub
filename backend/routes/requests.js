@@ -45,7 +45,7 @@ router.post('/', protect, async (req, res) => {
   try {
     const { type, details, sessionId } = req.body;
     const request = await Request.create({
-      user: req.user.id,
+      user: req.user._id,        // ✅ changed from req.user.id
       session: sessionId || null,
       type,
       details: details || {},

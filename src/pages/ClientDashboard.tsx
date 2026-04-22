@@ -129,7 +129,7 @@ const ClientDashboard = () => {
             </svg>
           </div>
           <div>
-            <h1 style={{ fontSize: "1.1rem", fontWeight: 600, letterSpacing: "0.15em", color: C.primary, margin: 0 }}>NETZONE</h1>
+            <h1 style={{ fontSize: "1.1rem", fontWeight: 600, letterSpacing: "0.15em", color: C.primary, margin: 0 }}>SHINESTAR</h1>
             <p style={{ fontSize: "0.68rem", color: C.muted, letterSpacing: "0.1em", fontFamily: "'Share Tech Mono',monospace", margin: 0 }}>
               {session ? session.computer?.computer_name || "PC" : "No active session"}
             </p>
