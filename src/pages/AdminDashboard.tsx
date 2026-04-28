@@ -1,5 +1,5 @@
 // src/pages/AdminDashboard.tsx
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
@@ -15,7 +15,6 @@ interface Computer {
   specifications?: { processor?: string; ram?: string; storage?: string; os?: string };
   current_session?: Session | null;
 }
-
 interface Session {
   _id: string;
   user: { _id: string; username: string };
@@ -26,7 +25,6 @@ interface Session {
   status: string;
   hourly_rate_at_start: number;
 }
-
 interface Request {
   _id: string;
   user: { _id: string; username: string };
@@ -36,7 +34,6 @@ interface Request {
   status: "pending" | "approved" | "rejected" | "completed";
   created_at: string;
 }
-
 interface User {
   _id: string;
   username: string;
@@ -45,24 +42,37 @@ interface User {
   is_online: boolean;
   last_login?: string;
   created_at: string;
-  active_session?: {
-    computer_name: string;
-    start_time: string;
-    remaining_time: number;
-  } | null;
+  active_session?: { computer_name: string; start_time: string; remaining_time: number } | null;
   total_sessions?: number;
   total_spent?: number;
 }
+interface PrintJob {
+  _id: string;
+  user: { _id: string; username: string };
+  file_name: string;
+  file_path?: string;
+  file_size?: number;
+  copies: number;
+  color: boolean;
+  pages: number;
+  cost: number;
+  status: "pending" | "printing" | "completed" | "failed" | "cancelled";
+  created_at: string;
+  printer_name?: string;
+}
+interface Message {
+  _id: string;
+  from: { _id: string; username: string; role: string };
+  text: string;
+  role: "client" | "admin";
+  created_at: string;
+  read: boolean;
+}
 
 const fmt = (secs: number) => {
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  const s = secs % 60;
-  return h > 0
-    ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-    : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}` : `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
 };
-
 const timeAgo = (dateStr: string) => {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
   if (diff < 60) return `${diff}s ago`;
@@ -70,7 +80,6 @@ const timeAgo = (dateStr: string) => {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 };
-
 const statusColor: Record<string, string> = {
   available: "#10b981", in_use: "#00d4ff", maintenance: "#f59e0b", offline: "#6b7280",
 };
@@ -78,25 +87,37 @@ const statusBg: Record<string, string> = {
   available: "rgba(16,185,129,0.1)", in_use: "rgba(0,212,255,0.1)",
   maintenance: "rgba(245,158,11,0.1)", offline: "rgba(107,114,128,0.1)",
 };
+const printStatusColor: Record<string, string> = {
+  pending: "#f59e0b", printing: "#00d4ff", completed: "#10b981", failed: "#f87171", cancelled: "#6b7280",
+};
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const { token, logout } = useAuth();
+  const { token, user: adminUser, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
 
   const [computers, setComputers] = useState<Computer[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [requests, setRequests] = useState<Request[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [earnings, setEarnings] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"computers" | "sessions" | "requests" | "users">("computers");
+  const [activeTab, setActiveTab] = useState<"computers" | "sessions" | "requests" | "users" | "print" | "messages">("computers");
   const [tick, setTick] = useState(0);
 
   // User tab state
   const [userFilter, setUserFilter] = useState<"all" | "online" | "offline">("all");
   const [userSearch, setUserSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  // Messages state
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [conversation, setConversation] = useState<Message[]>([]);
+  const [replyText, setReplyText] = useState("");
+  const [replying, setReplying] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
@@ -112,7 +133,25 @@ const AdminDashboard = () => {
       if (!res.ok) return;
       const data = await safeJson(res);
       if (data !== null) setUsers(data.users || data || []);
-    } catch { /* network error — ignore silently */ }
+    } catch { /* ignore */ }
+  }, [token]);
+
+  const fetchPrintJobs = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/print-jobs`, { headers });
+      if (!res.ok) return;
+      const data = await safeJson(res);
+      if (data !== null) setPrintJobs(data.jobs || data || []);
+    } catch { /* ignore */ }
+  }, [token]);
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/messages`, { headers });
+      if (!res.ok) return;
+      const data = await safeJson(res);
+      if (data !== null) setMessages(data.messages || data || []);
+    } catch { /* ignore */ }
   }, [token]);
 
   const fetchAll = useCallback(async () => {
@@ -127,20 +166,56 @@ const AdminDashboard = () => {
       ]);
       if (comp !== null) setComputers(comp.computers || comp || []);
       if (sess !== null) setSessions(sess.sessions || sess || []);
-      if (req  !== null) setRequests(req.requests || req || []);
+      if (req !== null) setRequests(req.requests || req || []);
       const activeSessions = sess ? (sess.sessions || sess || []) : [];
-      const total = activeSessions.reduce(
-        (sum: number, s: Session) => sum + (s.total_cost || 0), 0
-      );
+      const total = activeSessions.reduce((sum: number, s: Session) => sum + (s.total_cost || 0), 0);
       setEarnings(total);
     } catch (e) { console.error("Fetch error:", e); }
     finally { setLoading(false); }
     fetchUsers();
-  }, [token, fetchUsers]);
+    fetchPrintJobs();
+    fetchMessages();
+  }, [token, fetchUsers, fetchPrintJobs, fetchMessages]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
   useEffect(() => { const id = setInterval(() => setTick((t) => t + 1), 1000); return () => clearInterval(id); }, []);
   useEffect(() => { const id = setInterval(fetchAll, 30000); return () => clearInterval(id); }, [fetchAll]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
+
+  const fetchConversation = async (userId: string) => {
+    try {
+      const res = await fetch(`${API}/messages/conversation/${userId}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setConversation(data.messages || []);
+        // Mark as read
+        await fetch(`${API}/messages/read/${userId}`, { method: "PATCH", headers });
+        fetchMessages();
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleSelectClient = (userId: string) => {
+    setSelectedClientId(userId);
+    fetchConversation(userId);
+  };
+
+  const sendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyText.trim() || !selectedClientId) return;
+    setReplying(true);
+    try {
+      const res = await fetch(`${API}/messages/reply/${selectedClientId}`, {
+        method: "POST", headers,
+        body: JSON.stringify({ text: replyText }),
+      });
+      if (res.ok) {
+        setReplyText("");
+        fetchConversation(selectedClientId);
+      }
+    } catch (e) { console.error(e); }
+    setReplying(false);
+  };
 
   const handleRequest = async (id: string, action: "approved" | "rejected") => {
     await fetch(`${API}/requests/${id}/${action}`, { method: "PATCH", headers });
@@ -164,20 +239,33 @@ const AdminDashboard = () => {
     await fetch(`${API}/users/${userId}/kick`, { method: "POST", headers });
     fetchAll();
   };
+  const updatePrintJobStatus = async (jobId: string, status: string) => {
+    await fetch(`${API}/print-jobs/${jobId}`, { method: "PATCH", headers, body: JSON.stringify({ status }) });
+    fetchPrintJobs();
+  };
   const handleLogout = () => { logout(); navigate("/"); };
 
   const available = computers.filter((c) => c.status === "available").length;
   const inUse = computers.filter((c) => c.status === "in_use").length;
   const maintenance = computers.filter((c) => c.status === "maintenance").length;
   const onlineUsers = users.filter((u) => u.is_online).length;
+  const pendingPrintJobs = printJobs.filter((j) => j.status === "pending").length;
+  const unreadMessages = messages.filter((m) => !m.read && m.role === "client").length;
+
+  // Group messages by sender for inbox view
+  const messagesByClient = messages.reduce((acc, msg) => {
+    if (msg.role !== "client") return acc;
+    const uid = msg.from._id;
+    if (!acc[uid]) acc[uid] = { user: msg.from, messages: [], latest: msg };
+    acc[uid].messages.push(msg);
+    if (new Date(msg.created_at) > new Date(acc[uid].latest.created_at)) acc[uid].latest = msg;
+    return acc;
+  }, {} as Record<string, { user: Message["from"]; messages: Message[]; latest: Message }>);
 
   const filteredUsers = users.filter((u) => {
     const matchSearch = u.username.toLowerCase().includes(userSearch.toLowerCase()) ||
       (u.email || "").toLowerCase().includes(userSearch.toLowerCase());
-    const matchFilter =
-      userFilter === "all" ? true :
-      userFilter === "online" ? u.is_online :
-      !u.is_online;
+    const matchFilter = userFilter === "all" ? true : userFilter === "online" ? u.is_online : !u.is_online;
     return matchSearch && matchFilter;
   });
 
@@ -229,6 +317,7 @@ const AdminDashboard = () => {
           { label: "Maintenance", value: maintenance, color: C.warning, icon: "⚙" },
           { label: "Online Users", value: onlineUsers, color: C.primary, icon: "👤" },
           { label: "Pending", value: requests.length, color: C.danger, icon: "!" },
+          { label: "Print Jobs", value: pendingPrintJobs, color: C.warning, icon: "🖨" },
           { label: "Earnings", value: `KSh ${earnings.toFixed(2)}`, color: C.success, icon: "KSh" },
         ].map((s) => (
           <div key={s.label} style={{ ...S.statCard, background: C.surface, borderColor: C.border }}>
@@ -241,23 +330,26 @@ const AdminDashboard = () => {
 
       {/* Tabs */}
       <div style={S.tabs}>
-        {(["computers", "sessions", "users", "requests"] as const).map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
+        {([
+          { key: "computers", icon: "🖥" },
+          { key: "sessions", icon: "⏱" },
+          { key: "requests", icon: "📋" },
+          { key: "users", icon: "👥" },
+          { key: "print", icon: "🖨" },
+          { key: "messages", icon: "💬" },
+        ] as const).map(({ key, icon }) => (
+          <button key={key} onClick={() => setActiveTab(key)}
             style={{
               ...S.tab, borderColor: C.border,
-              color: activeTab === tab ? C.primary : C.muted,
-              background: activeTab === tab ? C.primaryBg : "transparent",
-              ...(activeTab === tab ? { borderColor: C.primaryBorder } : {}),
+              color: activeTab === key ? C.primary : C.muted,
+              background: activeTab === key ? C.primaryBg : "transparent",
+              ...(activeTab === key ? { borderColor: C.primaryBorder } : {}),
             }}>
-            {tab === "computers" && "🖥 "}
-            {tab === "sessions" && "⏱ "}
-            {tab === "requests" && "📋 "}
-            {tab === "users" && "👥 "}
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            {tab === "requests" && requests.length > 0 && <span style={S.badge}>{requests.length}</span>}
-            {tab === "users" && onlineUsers > 0 && (
-              <span style={{ ...S.badge, background: C.success }}>{onlineUsers}</span>
-            )}
+            {icon} {key.charAt(0).toUpperCase() + key.slice(1)}
+            {key === "requests" && requests.length > 0 && <span style={S.badge}>{requests.length}</span>}
+            {key === "users" && onlineUsers > 0 && <span style={{ ...S.badge, background: C.success }}>{onlineUsers}</span>}
+            {key === "print" && pendingPrintJobs > 0 && <span style={{ ...S.badge, background: C.warning }}>{pendingPrintJobs}</span>}
+            {key === "messages" && unreadMessages > 0 && <span style={{ ...S.badge, background: C.primary }}>{unreadMessages}</span>}
           </button>
         ))}
       </div>
@@ -344,39 +436,18 @@ const AdminDashboard = () => {
       {/* ── USERS ── */}
       {activeTab === "users" && (
         <div style={{ padding: "0 2rem", position: "relative", zIndex: 1 }}>
-
-          {/* Search + filter bar */}
           <div style={{ display: "flex", gap: 10, marginBottom: "1.25rem", flexWrap: "wrap" }}>
             <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
-              <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
-                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2">
+              <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2">
                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
               </svg>
-              <input
-                type="text"
-                placeholder="Search by username or email..."
-                value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
-                style={{
-                  width: "100%", padding: "0.55rem 1rem 0.55rem 2.1rem",
-                  background: C.surface, border: `1px solid ${C.border}`,
-                  borderRadius: 8, color: C.text, fontSize: "0.85rem",
-                  fontFamily: "'Share Tech Mono',monospace", outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
+              <input type="text" placeholder="Search by username or email..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)}
+                style={{ width: "100%", padding: "0.55rem 1rem 0.55rem 2.1rem", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: "0.85rem", fontFamily: "'Share Tech Mono',monospace", outline: "none", boxSizing: "border-box" }} />
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               {(["all", "online", "offline"] as const).map((f) => (
                 <button key={f} onClick={() => setUserFilter(f)}
-                  style={{
-                    padding: "0.45rem 0.9rem", border: `1px solid ${C.border}`,
-                    borderRadius: 8, background: userFilter === f ? C.primaryBg : "transparent",
-                    color: userFilter === f ? C.primary : C.muted,
-                    borderColor: userFilter === f ? C.primaryBorder : C.border,
-                    cursor: "pointer", fontSize: "0.78rem",
-                    fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em",
-                  }}>
+                  style={{ padding: "0.45rem 0.9rem", border: `1px solid ${userFilter === f ? C.primaryBorder : C.border}`, borderRadius: 8, background: userFilter === f ? C.primaryBg : "transparent", color: userFilter === f ? C.primary : C.muted, cursor: "pointer", fontSize: "0.78rem", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em" }}>
                   {f === "online" && <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: C.success, marginRight: 5 }} />}
                   {f === "offline" && <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: C.muted, marginRight: 5 }} />}
                   {f.toUpperCase()} {f === "online" ? `(${onlineUsers})` : f === "offline" ? `(${users.length - onlineUsers})` : `(${users.length})`}
@@ -384,114 +455,44 @@ const AdminDashboard = () => {
               ))}
             </div>
           </div>
-
-          {/* User table */}
           {filteredUsers.length === 0 && <EmptyState text="No users found" color={C.muted} />}
           {filteredUsers.length > 0 && (
             <div style={{ overflowX: "auto" }}>
               <table style={S.table}>
                 <thead>
-                  <tr>
-                    {["Status", "Username", "Email", "Role", "Active Session", "Last Login", "Total Sessions", "Spent", "Actions"].map((h) => (
-                      <th key={h} style={{ ...S.th, color: C.muted, borderBottomColor: C.border }}>{h}</th>
-                    ))}
-                  </tr>
+                  <tr>{["Status", "Username", "Email", "Role", "Active Session", "Last Login", "Total Sessions", "Spent", "Actions"].map((h) => (
+                    <th key={h} style={{ ...S.th, color: C.muted, borderBottomColor: C.border }}>{h}</th>
+                  ))}</tr>
                 </thead>
                 <tbody>
                   {filteredUsers.map((u) => (
-                    <tr key={u._id}
-                      style={{ ...S.tr, borderBottomColor: C.surface2, cursor: "pointer" }}
-                      onClick={() => setSelectedUser(selectedUser?._id === u._id ? null : u)}>
-                      {/* Online dot */}
-                      <td style={{ ...S.td, textAlign: "center" }}>
-                        <span style={{
-                          display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-                          background: u.is_online ? C.success : C.muted,
-                          boxShadow: u.is_online ? `0 0 6px ${C.success}` : "none",
-                        }} />
-                      </td>
-                      {/* Username */}
+                    <tr key={u._id} style={{ ...S.tr, borderBottomColor: C.surface2, cursor: "pointer" }} onClick={() => setSelectedUser(selectedUser?._id === u._id ? null : u)}>
+                      <td style={{ ...S.td, textAlign: "center" }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: u.is_online ? C.success : C.muted, boxShadow: u.is_online ? `0 0 6px ${C.success}` : "none" }} /></td>
                       <td style={S.td}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{
-                            width: 28, height: 28, borderRadius: "50%",
-                            background: u.is_online ? "rgba(0,212,255,0.12)" : C.surface2,
-                            border: `1px solid ${u.is_online ? C.primaryBorder : C.border}`,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "0.7rem", fontWeight: 600,
-                            color: u.is_online ? C.primary : C.muted,
-                            fontFamily: "'Share Tech Mono',monospace",
-                            flexShrink: 0,
-                          }}>
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: u.is_online ? "rgba(0,212,255,0.12)" : C.surface2, border: `1px solid ${u.is_online ? C.primaryBorder : C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 600, color: u.is_online ? C.primary : C.muted, fontFamily: "'Share Tech Mono',monospace", flexShrink: 0 }}>
                             {u.username.slice(0, 2).toUpperCase()}
                           </div>
-                          <span style={{ color: u.is_online ? C.text : C.text2, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.85rem" }}>
-                            {u.username}
-                          </span>
+                          <span style={{ color: u.is_online ? C.text : C.text2, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.85rem" }}>{u.username}</span>
                         </div>
                       </td>
-                      {/* Email */}
-                      <td style={S.td}>
-                        <span style={{ color: C.muted, fontSize: "0.8rem", fontFamily: "'Share Tech Mono',monospace" }}>
-                          {u.email || "—"}
-                        </span>
-                      </td>
-                      {/* Role */}
-                      <td style={S.td}>
-                        <span style={{
-                          padding: "0.18rem 0.55rem", borderRadius: 5, fontSize: "0.68rem",
-                          letterSpacing: "0.08em", fontFamily: "'Share Tech Mono',monospace",
-                          background: u.role === "admin" ? "rgba(124,58,237,0.12)" : C.surface2,
-                          color: u.role === "admin" ? "#a78bfa" : C.muted,
-                          border: `1px solid ${u.role === "admin" ? "rgba(124,58,237,0.3)" : C.border}`,
-                        }}>
-                          {u.role.toUpperCase()}
-                        </span>
-                      </td>
-                      {/* Active session */}
+                      <td style={S.td}><span style={{ color: C.muted, fontSize: "0.8rem", fontFamily: "'Share Tech Mono',monospace" }}>{u.email || "—"}</span></td>
+                      <td style={S.td}><span style={{ padding: "0.18rem 0.55rem", borderRadius: 5, fontSize: "0.68rem", letterSpacing: "0.08em", fontFamily: "'Share Tech Mono',monospace", background: u.role === "admin" ? "rgba(124,58,237,0.12)" : C.surface2, color: u.role === "admin" ? "#a78bfa" : C.muted, border: `1px solid ${u.role === "admin" ? "rgba(124,58,237,0.3)" : C.border}` }}>{u.role.toUpperCase()}</span></td>
                       <td style={S.td}>
                         {u.active_session ? (
                           <div>
-                            <div style={{ background: C.primaryBg, color: C.primary, border: `1px solid ${C.primaryBorder}`, padding: "0.18rem 0.5rem", borderRadius: 4, fontSize: "0.75rem", fontFamily: "'Share Tech Mono',monospace", display: "inline-block" }}>
-                              {u.active_session.computer_name}
-                            </div>
-                            <div style={{ color: C.success, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.72rem", marginTop: 2 }}>
-                              ⏱ {fmt(u.active_session.remaining_time)}
-                            </div>
+                            <div style={{ background: C.primaryBg, color: C.primary, border: `1px solid ${C.primaryBorder}`, padding: "0.18rem 0.5rem", borderRadius: 4, fontSize: "0.75rem", fontFamily: "'Share Tech Mono',monospace", display: "inline-block" }}>{u.active_session.computer_name}</div>
+                            <div style={{ color: C.success, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.72rem", marginTop: 2 }}>⏱ {fmt(u.active_session.remaining_time)}</div>
                           </div>
-                        ) : (
-                          <span style={{ color: C.muted, fontSize: "0.78rem", fontFamily: "'Share Tech Mono',monospace" }}>—</span>
-                        )}
+                        ) : <span style={{ color: C.muted, fontSize: "0.78rem", fontFamily: "'Share Tech Mono',monospace" }}>—</span>}
                       </td>
-                      {/* Last login */}
-                      <td style={S.td}>
-                        <span style={{ color: C.muted, fontSize: "0.78rem", fontFamily: "'Share Tech Mono',monospace" }}>
-                          {u.last_login ? timeAgo(u.last_login) : "Never"}
-                        </span>
-                      </td>
-                      {/* Total sessions */}
-                      <td style={S.td}>
-                        <span style={{ color: C.text2, fontFamily: "monospace", fontSize: "0.85rem" }}>
-                          {u.total_sessions ?? 0}
-                        </span>
-                      </td>
-                      {/* Total spent */}
-                      <td style={S.td}>
-                        <span style={{ color: C.success, fontFamily: "monospace", fontSize: "0.85rem" }}>
-                          KSh {(u.total_spent ?? 0).toFixed(2)}
-                        </span>
-                      </td>
-                      {/* Actions */}
+                      <td style={S.td}><span style={{ color: C.muted, fontSize: "0.78rem", fontFamily: "'Share Tech Mono',monospace" }}>{u.last_login ? timeAgo(u.last_login) : "Never"}</span></td>
+                      <td style={S.td}><span style={{ color: C.text2, fontFamily: "monospace", fontSize: "0.85rem" }}>{u.total_sessions ?? 0}</span></td>
+                      <td style={S.td}><span style={{ color: C.success, fontFamily: "monospace", fontSize: "0.85rem" }}>KSh {(u.total_spent ?? 0).toFixed(2)}</span></td>
                       <td style={S.td} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: "flex", gap: 4 }}>
-                          {u.is_online && u.role !== "admin" && (
-                            <button style={{ ...S.iconBtn, color: C.danger }} onClick={() => kickUser(u._id)}>
-                              Kick
-                            </button>
-                          )}
-                          <button style={{ ...S.iconBtn, color: C.primary }} onClick={() => setSelectedUser(selectedUser?._id === u._id ? null : u)}>
-                            {selectedUser?._id === u._id ? "Hide" : "View"}
-                          </button>
+                          {u.is_online && u.role !== "admin" && <button style={{ ...S.iconBtn, color: C.danger }} onClick={() => kickUser(u._id)}>Kick</button>}
+                          <button style={{ ...S.iconBtn, color: C.primary }} onClick={() => setSelectedUser(selectedUser?._id === u._id ? null : u)}>{selectedUser?._id === u._id ? "Hide" : "View"}</button>
                         </div>
                       </td>
                     </tr>
@@ -500,37 +501,20 @@ const AdminDashboard = () => {
               </table>
             </div>
           )}
-
-          {/* Expanded user detail panel */}
           {selectedUser && (
-            <div style={{
-              marginTop: "1.25rem", background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 12, padding: "1.25rem",
-              borderLeft: `3px solid ${selectedUser.is_online ? C.primary : C.muted}`,
-            }}>
+            <div style={{ marginTop: "1.25rem", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "1.25rem", borderLeft: `3px solid ${selectedUser.is_online ? C.primary : C.muted}` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: "50%",
-                    background: selectedUser.is_online ? C.primaryBg : C.surface2,
-                    border: `2px solid ${selectedUser.is_online ? C.primary : C.border}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "1rem", fontWeight: 600, color: selectedUser.is_online ? C.primary : C.muted,
-                    fontFamily: "'Share Tech Mono',monospace",
-                  }}>
+                  <div style={{ width: 44, height: 44, borderRadius: "50%", background: selectedUser.is_online ? C.primaryBg : C.surface2, border: `2px solid ${selectedUser.is_online ? C.primary : C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", fontWeight: 600, color: selectedUser.is_online ? C.primary : C.muted, fontFamily: "'Share Tech Mono',monospace" }}>
                     {selectedUser.username.slice(0, 2).toUpperCase()}
                   </div>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: "1rem", color: C.text }}>{selectedUser.username}</div>
-                    <div style={{ fontSize: "0.75rem", color: C.muted, fontFamily: "'Share Tech Mono',monospace" }}>
-                      {selectedUser.email || "No email"} · Joined {new Date(selectedUser.created_at).toLocaleDateString()}
-                    </div>
+                    <div style={{ fontSize: "0.75rem", color: C.muted, fontFamily: "'Share Tech Mono',monospace" }}>{selectedUser.email || "No email"} · Joined {new Date(selectedUser.created_at).toLocaleDateString()}</div>
                   </div>
                 </div>
-                <button onClick={() => setSelectedUser(null)}
-                  style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: "1.1rem" }}>✕</button>
+                <button onClick={() => setSelectedUser(null)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: "1.1rem" }}>✕</button>
               </div>
-
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
                 {[
                   { label: "Status", value: selectedUser.is_online ? "● Online" : "○ Offline", color: selectedUser.is_online ? C.success : C.muted },
@@ -576,6 +560,133 @@ const AdminDashboard = () => {
           ))}
         </div>
       )}
+
+      {/* ── PRINT JOBS ── */}
+      {activeTab === "print" && (
+        <div style={{ padding: "0 2rem", position: "relative", zIndex: 1 }}>
+          {printJobs.length === 0 && <EmptyState text="No print jobs submitted" color={C.muted} />}
+          {printJobs.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {printJobs.map((job) => (
+                <div key={job._id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "1.1rem 1.25rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: `${printStatusColor[job.status]}18`, border: `1px solid ${printStatusColor[job.status]}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", flexShrink: 0 }}>🖨</div>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: "0.9rem", color: C.text, fontFamily: "'Share Tech Mono',monospace", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{job.file_name}</p>
+                      <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: "0.72rem", color: C.muted, fontFamily: "'Share Tech Mono',monospace" }}>👤 {job.user?.username}</span>
+                        <span style={{ fontSize: "0.72rem", color: C.muted, fontFamily: "'Share Tech Mono',monospace" }}>📄 {job.pages}p × {job.copies}</span>
+                        <span style={{ fontSize: "0.72rem", color: job.color ? "#f59e0b" : C.muted, fontFamily: "'Share Tech Mono',monospace" }}>{job.color ? "🎨 Color" : "⬛ B&W"}</span>
+                        <span style={{ fontSize: "0.72rem", color: C.success, fontFamily: "'Share Tech Mono',monospace" }}>KSh {job.cost.toFixed(2)}</span>
+                        <span style={{ fontSize: "0.72rem", color: C.muted, fontFamily: "'Share Tech Mono',monospace" }}>{timeAgo(job.created_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <span style={{ fontSize: "0.72rem", padding: "0.25rem 0.65rem", borderRadius: 6, fontFamily: "'Share Tech Mono',monospace", background: `${printStatusColor[job.status]}18`, color: printStatusColor[job.status], border: `1px solid ${printStatusColor[job.status]}44`, letterSpacing: "0.06em" }}>
+                      {job.status.toUpperCase()}
+                    </span>
+                    {job.status === "pending" && (
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button style={{ ...S.iconBtn, color: C.primary }} onClick={() => updatePrintJobStatus(job._id, "printing")}>🖨 Print</button>
+                        <button style={{ ...S.iconBtn, color: C.success }} onClick={() => updatePrintJobStatus(job._id, "completed")}>✓ Done</button>
+                        <button style={{ ...S.iconBtn, color: C.danger }} onClick={() => updatePrintJobStatus(job._id, "failed")}>✕ Fail</button>
+                      </div>
+                    )}
+                    {job.status === "printing" && (
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button style={{ ...S.iconBtn, color: C.success }} onClick={() => updatePrintJobStatus(job._id, "completed")}>✓ Done</button>
+                        <button style={{ ...S.iconBtn, color: C.danger }} onClick={() => updatePrintJobStatus(job._id, "failed")}>✕ Fail</button>
+                      </div>
+                    )}
+                    {job.file_path && (
+                      <a href={`${import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000"}/uploads/print/${job.file_path.split(/[\\/]/).pop()}`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{ ...S.iconBtn, color: C.warning, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+                        ⬇ Download
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── MESSAGES ── */}
+      {activeTab === "messages" && (
+        <div style={{ padding: "0 2rem", display: "grid", gridTemplateColumns: "280px 1fr", gap: 16, position: "relative", zIndex: 1, alignItems: "start" }}>
+
+          {/* Inbox sidebar */}
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "0.85rem 1rem", borderBottom: `1px solid ${C.border}`, fontSize: "0.7rem", color: C.muted, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'Share Tech Mono',monospace" }}>
+              Client Inbox {unreadMessages > 0 && <span style={{ ...S.badge, marginLeft: 6, background: C.primary }}>{unreadMessages}</span>}
+            </div>
+            {Object.keys(messagesByClient).length === 0
+              ? <div style={{ padding: "2rem 1rem", textAlign: "center", color: C.muted, fontSize: "0.8rem", fontFamily: "'Share Tech Mono',monospace" }}>No messages yet</div>
+              : Object.values(messagesByClient).map(({ user: msgUser, latest, messages: msgs }) => {
+                  const unread = msgs.filter((m) => !m.read).length;
+                  const isSelected = selectedClientId === msgUser._id;
+                  return (
+                    <div key={msgUser._id}
+                      onClick={() => handleSelectClient(msgUser._id)}
+                      style={{ padding: "0.85rem 1rem", cursor: "pointer", borderBottom: `1px solid ${C.border}`, background: isSelected ? C.primaryBg : "transparent", borderLeft: isSelected ? `3px solid ${C.primary}` : "3px solid transparent", transition: "all 0.15s" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: isSelected ? C.primary : C.text, fontFamily: "'Share Tech Mono',monospace" }}>{msgUser.username}</span>
+                        {unread > 0 && <span style={{ ...S.badge, background: C.primary, width: "auto", padding: "0 5px", borderRadius: 8 }}>{unread}</span>}
+                      </div>
+                      <p style={{ margin: 0, fontSize: "0.72rem", color: C.muted, fontFamily: "'Share Tech Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{latest.text}</p>
+                      <p style={{ margin: "2px 0 0", fontSize: "0.65rem", color: C.muted, fontFamily: "'Share Tech Mono',monospace" }}>{timeAgo(latest.created_at)}</p>
+                    </div>
+                  );
+                })}
+          </div>
+
+          {/* Conversation panel */}
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, display: "flex", flexDirection: "column", minHeight: 450 }}>
+            {!selectedClientId
+              ? <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.85rem", flexDirection: "column", gap: 8 }}>
+                  <span style={{ fontSize: "2rem" }}>💬</span>
+                  <span>Select a client to view conversation</span>
+                </div>
+              : <>
+                  <div style={{ padding: "0.85rem 1rem", borderBottom: `1px solid ${C.border}`, fontSize: "0.8rem", color: C.text, fontFamily: "'Share Tech Mono',monospace", fontWeight: 600 }}>
+                    💬 {messagesByClient[selectedClientId]?.user.username || "Client"}
+                  </div>
+                  <div style={{ flex: 1, padding: "1rem", overflowY: "auto", maxHeight: 360, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {conversation.map((msg, i) => {
+                      const isAdmin = msg.role === "admin";
+                      return (
+                        <div key={msg._id || i} style={{ display: "flex", flexDirection: "column", alignItems: isAdmin ? "flex-end" : "flex-start" }}>
+                          <span style={{ fontSize: "0.65rem", color: C.muted, fontFamily: "'Share Tech Mono',monospace", marginBottom: 2 }}>
+                            {isAdmin ? "You (admin)" : msg.from.username}
+                          </span>
+                          <div style={{ maxWidth: "75%", padding: "0.6rem 0.9rem", borderRadius: 10, fontSize: "0.88rem", lineHeight: 1.4, background: isAdmin ? C.primaryBg : C.surface2, border: `1px solid ${isAdmin ? C.primaryBorder : C.border}`, color: isAdmin ? C.primary : C.text }}>
+                            {msg.text}
+                            <div style={{ fontSize: "0.62rem", opacity: 0.5, fontFamily: "'Share Tech Mono',monospace", marginTop: 3, textAlign: "right" }}>{new Date(msg.created_at).toLocaleTimeString()}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={chatEndRef} />
+                  </div>
+                  <form onSubmit={sendReply} style={{ padding: "0.85rem 1rem", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8 }}>
+                    <input
+                      style={{ flex: 1, padding: "0.6rem 0.9rem", background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.88rem", outline: "none" }}
+                      placeholder="Type a reply..."
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                    />
+                    <button type="submit" disabled={replying || !replyText.trim()}
+                      style={{ padding: "0.6rem 1.1rem", background: C.primaryBg, border: `1px solid ${C.primaryBorder}`, borderRadius: 8, color: C.primary, cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", fontSize: "0.9rem", fontWeight: 600, opacity: replying || !replyText.trim() ? 0.5 : 1 }}>
+                      Reply →
+                    </button>
+                  </form>
+                </>}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -615,7 +726,7 @@ const S: Record<string, React.CSSProperties> = {
   liveDot: { width: 6, height: 6, borderRadius: "50%", display: "inline-block" },
   themeBtn: { padding: "0.4rem 0.85rem", border: "1px solid", borderRadius: 6, background: "transparent", cursor: "pointer", fontFamily: "'Share Tech Mono',monospace", fontSize: "0.75rem", letterSpacing: "0.05em", transition: "all 0.2s" },
   logoutBtn: { padding: "0.4rem 0.9rem", border: "1px solid", borderRadius: 6, background: "transparent", cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", fontSize: "0.85rem", letterSpacing: "0.05em" },
-  statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, padding: "1.5rem 2rem", position: "relative", zIndex: 1 },
+  statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12, padding: "1.5rem 2rem", position: "relative", zIndex: 1 },
   statCard: { border: "1px solid", borderRadius: 12, padding: "1rem", textAlign: "center" },
   statIcon: { fontSize: "1.2rem", marginBottom: "0.5rem" },
   statValue: { fontSize: "1.8rem", fontWeight: 600, lineHeight: 1, marginBottom: "0.25rem" },
